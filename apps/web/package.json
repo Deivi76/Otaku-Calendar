@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@otaku-calendar/core": "*",
+    "@otaku-calendar/crawler": "*",
     "@otaku-calendar/db": "*",
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.39.0",

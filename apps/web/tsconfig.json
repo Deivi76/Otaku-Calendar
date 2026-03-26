@@ -17,7 +17,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@otaku-calendar/core": ["../../packages/core/src"],
-      "@otaku-calendar/db": ["../../packages/db/src"]
+      "@otaku-calendar/db": ["../../packages/db/src"],
+      "@otaku-calendar/crawler": ["../../apps/crawler/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

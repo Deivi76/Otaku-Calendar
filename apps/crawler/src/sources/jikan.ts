@@ -19,7 +19,7 @@ export async function fetchSchedule(): Promise<CrawledItem[]> {
       throw new Error(`Jikan API error: ${res.status}`);
     }
     
-    const data = await res.json();
+    const data: any = await res.json();
     
     return data.data?.map((anime: any) => ({
       title: anime.title || anime.title_japanese,
@@ -45,7 +45,7 @@ export async function fetchTopAnime(): Promise<CrawledItem[]> {
       throw new Error(`Jikan API error: ${res.status}`);
     }
     
-    const data = await res.json();
+    const data: any = await res.json();
     
     return data.data?.map((anime: any) => ({
       title: anime.title || anime.title_japanese,
@@ -63,11 +63,7 @@ export async function fetchTopAnime(): Promise<CrawledItem[]> {
 
 export async function fetchSeasonNow(): Promise<CrawledItem[]> {
   try {
-    const now = new Date();
-    const year = now.getFullYear();
-    const season = ['winter', 'spring', 'summer', 'fall'][Math.floor(now.getMonth() / 3)];
-    
-    const res = await fetch(`${JIKAN_API}/seasons/${year}/${season}?limit=50`, {
+    const res = await fetch(`${JIKAN_API}/seasons/now?limit=50`, {
       signal: AbortSignal.timeout(10000),
     });
     
@@ -75,7 +71,7 @@ export async function fetchSeasonNow(): Promise<CrawledItem[]> {
       throw new Error(`Jikan API error: ${res.status}`);
     }
     
-    const data = await res.json();
+    const data: any = await res.json();
     
     return data.data?.map((anime: any) => ({
       title: anime.title || anime.title_japanese,

@@ -63,7 +63,7 @@ async function fetchAniList<T>(query: string): Promise<T> {
     throw new Error(`AniList API error: ${res.status}`);
   }
 
-  const json = await res.json();
+  const json: any = await res.json();
   if (json.errors) {
     throw new Error(`AniList GraphQL error: ${json.errors[0].message}`);
   }

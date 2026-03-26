@@ -9,20 +9,29 @@ export interface CrawledItem {
   publishedAt?: string;
 }
 
-const parser = new Parser();
+const parser = new Parser({
+  timeout: 30000,
+});
 
 export async function crawlRSS(url: string): Promise<CrawledItem[]> {
   try {
     const feed = await parser.parseURL(url);
     
-    return feed.items.map(item => ({
+    if (!feed.items || feed.items.length === 0) {
+      console.warn(`No items found in RSS feed: ${url}`);
+      return [];
+    }
+    
+    const items = feed.items.map(item => ({
       title: item.title || '',
       content: item.contentSnippet || item.content || '',
       source: url,
-      sourceType: 'rss',
+      sourceType: 'rss' as const,
       url: item.link,
       publishedAt: item.pubDate,
     }));
+    
+    return items;
   } catch (error) {
     console.error(`Error crawling RSS ${url}:`, error);
     return [];

@@ -1,0 +1,36 @@
+
+> @otaku-calendar/web@0.1.0 build
+> next build
+
+   ▲ Next.js 14.1.0
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/6) ...
+   Generating static pages (1/6) 
+   Generating static pages (2/6) 
+   Generating static pages (4/6) 
+ ✓ Generating static pages (6/6) 
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    177 B          91.1 kB
+├ ○ /_not-found                          881 B            85 kB
+├ λ /anime/[id]                          177 B          91.1 kB
+├ λ /api/crawl                           0 B                0 B
+├ λ /auth/callback                       0 B                0 B
+└ ○ /radar                               934 B          85.1 kB
++ First Load JS shared by all            84.2 kB
+  ├ chunks/1dd3208c-d55acdf725b87239.js  53.4 kB
+  ├ chunks/997-578b095e716b6b47.js       28.9 kB
+  └ other shared chunks (total)          1.87 kB
+
+
+ƒ Middleware                             39.8 kB
+
+○  (Static)   prerendered as static content
+λ  (Dynamic)  server-rendered on demand using Node.js
+

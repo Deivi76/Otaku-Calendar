@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 
-export default async function AuthCallback() {
+export async function GET() {
   const supabase = createClient();
   
   const { data: { user }, error } = await supabase.auth.getUser();

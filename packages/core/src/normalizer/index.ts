@@ -2,7 +2,7 @@ export interface RawAnimeItem {
   title: string;
   content: string;
   source: string;
-  sourceType: 'site' | 'rss' | 'api' | 'social';
+  sourceType: 'site' | 'rss' | 'api' | 'social' | 'platform' | 'community' | 'rumor';
   url?: string;
   publishedAt?: string;
 }
@@ -13,9 +13,10 @@ export interface NormalizedAnimeItem {
   date: Date | null;
   type: 'confirmed' | 'rumor' | 'announcement' | 'live_action';
   source: string;
-  sourceType: 'site' | 'rss' | 'api' | 'social';
+  sourceType: 'site' | 'rss' | 'api' | 'social' | 'platform' | 'community' | 'rumor';
   confidence: number;
   url?: string;
+  content?: string;
 }
 
 const ANIME_NAME_PATTERNS = [
@@ -46,13 +47,14 @@ export function normalize(item: RawAnimeItem): NormalizedAnimeItem {
     sourceType: item.sourceType,
     confidence: 0.5,
     url: item.url,
+    content: item.content,
   };
 }
 
 export function extractAnimeName(text: string): string {
   let name = text
     .replace(/episode\s*\d+/gi, '')
-    /\.+  .replace(/[-–]\s*episode\s*\d+/gi, '')
+    .replace(/[-–]\s*episode\s*\d+/gi, '')
     .replace(/\[.*?\]/g, '')
     .replace(/\(.*?\)/g, '')
     .trim();

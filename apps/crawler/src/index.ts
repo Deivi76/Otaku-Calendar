@@ -1,15 +1,25 @@
 import 'dotenv/config';
-import { crawlSites } from './sources/sites';
-import { crawlRSSFeeds } from './sources/rss';
-import { crawlAniList } from './sources/anilist';
-import { crawlJikan } from './sources/jikan';
+import { crawlAnime } from './sources/anime';
+import { crawlManga } from './sources/manga';
+import { crawlFilms } from './sources/film';
+import { crawlSeries } from './sources/series';
+import { crawlManhwa } from './sources/manhwa';
+import { crawlLiveActions } from './sources/liveAction';
+import { crawlRumors } from './sources/rumors';
 import { SOURCES, getEnvConfig } from './sources/config';
 import { normalize, classifyItem } from '@otaku-calendar/core';
 import { deduplicate } from '@otaku-calendar/core';
 
+const rssFromEnv = process.env.CRAWLER_RSS ? process.env.CRAWLER_RSS.split(',').filter(Boolean) : [];
+const rssFallback = [
+  ...SOURCES.rss.news.map(f => f.url),
+  ...SOURCES.rss.manga.map(f => f.url),
+  ...SOURCES.rss.community.map(f => f.url),
+];
+
 const CRAWLER_CONFIG = {
-  sites: (process.env.CRAWLER_SITES || '').split(',').filter(Boolean),
-  rss: (process.env.CRAWLER_RSS || '').split(',').filter(Boolean),
+  sites: process.env.CRAWLER_SITES ? process.env.CRAWLER_SITES.split(',').filter(Boolean) : SOURCES.sites.news.map(s => s.url),
+  rss: rssFromEnv.length ? rssFromEnv : rssFallback,
   apis: (process.env.CRAWLER_APIS || '').split(',').filter(Boolean),
   webtoon: (process.env.CRAWLER_WEBTOON || '').split(',').filter(Boolean),
   social: {
@@ -28,24 +38,33 @@ async function runCrawler() {
   console.log(`   - ${envConfig.sites.split(',').length} sites configured`);
   console.log(`   - ${envConfig.rss.split(',').length} RSS feeds configured`);
 
-  const [siteResults, rssResults, anilistResults, jikanResults] = await Promise.all([
-    crawlSites(CRAWLER_CONFIG.sites),
-    crawlRSSFeeds(CRAWLER_CONFIG.rss),
-    crawlAniList(),
-    crawlJikan(),
+  const [animeResults, mangaResults, filmResults, seriesResults, manhwaResults, liveActionResults, rumorsResults] = await Promise.all([
+    crawlAnime(),
+    crawlManga(),
+    crawlFilms(),
+    crawlSeries(),
+    crawlManhwa(),
+    crawlLiveActions(),
+    crawlRumors(),
   ]);
 
   console.log(`📊 Crawled results:`);
-  console.log(`   - Sites: ${siteResults.length} items`);
-  console.log(`   - RSS: ${rssResults.length} items`);
-  console.log(`   - AniList: ${anilistResults.length} items`);
-  console.log(`   - Jikan: ${jikanResults.length} items`);
+  console.log(`   - Anime: ${animeResults.length} items`);
+  console.log(`   - Manga: ${mangaResults.length} items`);
+  console.log(`   - Films: ${filmResults.length} items`);
+  console.log(`   - Series: ${seriesResults.length} items`);
+  console.log(`   - Manhwa: ${manhwaResults.length} items`);
+  console.log(`   - LiveActions: ${liveActionResults.length} items`);
+  console.log(`   - Rumors: ${rumorsResults.length} items`);
 
   const allResults = [
-    ...siteResults,
-    ...rssResults,
-    ...anilistResults,
-    ...jikanResults,
+    ...animeResults,
+    ...mangaResults,
+    ...filmResults,
+    ...seriesResults,
+    ...manhwaResults,
+    ...liveActionResults,
+    ...rumorsResults,
   ];
 
   console.log(`\n🔍 Normalizing ${allResults.length} items...`);
@@ -65,7 +84,7 @@ async function runCrawler() {
   if (unique.length > 0) {
     console.log('\n📋 Sample events:');
     unique.slice(0, 3).forEach((event, i) => {
-      console.log(`   ${i + 1}. ${event.title?.substring(0, 50)}... [${event.type}]`);
+      console.log(`   ${i + 1}. ${event.anime?.substring(0, 50)}... [${event.type}]`);
     });
   }
   

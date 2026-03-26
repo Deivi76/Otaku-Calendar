@@ -8,11 +8,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not found. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
 }
 
+const isBrowser = typeof window !== 'undefined';
+
 export function createSupabaseClient(): SupabaseClient {
   return createClient(supabaseUrl!, supabaseAnonKey!, {
     auth: {
-      persistSession: typeof window !== 'undefined',
-      autoRefreshToken: typeof window !== 'undefined',
+      persistSession: isBrowser,
+      autoRefreshToken: isBrowser,
     },
   });
 }
