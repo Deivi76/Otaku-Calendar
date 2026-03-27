@@ -8,6 +8,7 @@
  ✓ Compiled successfully
    Linting and checking validity of types ...
    Collecting page data ...
+Supabase credentials not found. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
    Generating static pages (0/6) ...
    Generating static pages (1/6) 
    Generating static pages (2/6) 
@@ -17,16 +18,17 @@
    Collecting build traces ...
 
 Route (app)                              Size     First Load JS
-┌ ○ /                                    177 B          91.1 kB
-├ ○ /_not-found                          881 B            85 kB
-├ λ /anime/[id]                          177 B          91.1 kB
+┌ ○ /                                    177 B          91.2 kB
+├ ○ /_not-found                          881 B          85.1 kB
+├ λ /anime/[id]                          177 B          91.2 kB
 ├ λ /api/crawl                           0 B                0 B
+├ λ /api/rumors/[id]                     0 B                0 B
 ├ λ /auth/callback                       0 B                0 B
-└ ○ /radar                               934 B          85.1 kB
-+ First Load JS shared by all            84.2 kB
-  ├ chunks/1dd3208c-d55acdf725b87239.js  53.4 kB
-  ├ chunks/997-578b095e716b6b47.js       28.9 kB
-  └ other shared chunks (total)          1.87 kB
+└ ○ /radar                               7.48 kB        98.5 kB
++ First Load JS shared by all            84.3 kB
+  ├ chunks/1dd3208c-be03019bfed0e293.js  53.4 kB
+  ├ chunks/997-23ec1c932fc3965a.js       28.9 kB
+  └ other shared chunks (total)          1.96 kB
 
 
 ƒ Middleware                             39.8 kB

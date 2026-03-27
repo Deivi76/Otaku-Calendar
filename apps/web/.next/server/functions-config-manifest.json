@@ -1,1 +1,1 @@
-{"version":1,"functions":{"/api/crawl":{}}}
+{"version":1,"functions":{"/api/rumors/[id]":{},"/api/crawl":{}}}

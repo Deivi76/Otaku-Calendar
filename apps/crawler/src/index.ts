@@ -1,68 +1,68 @@
 import 'dotenv/config';
-import { crawlAnime } from './sources/anime';
-import { crawlManga } from './sources/manga';
-import { crawlFilms } from './sources/film';
-import { crawlSeries } from './sources/series';
-import { crawlManhwa } from './sources/manhwa';
-import { crawlLiveActions } from './sources/liveAction';
-import { crawlRumors } from './sources/rumors';
-import { SOURCES, getEnvConfig } from './sources/config';
-import { normalize, classifyItem } from '@otaku-calendar/core';
+import { crawlAPI_Priority1 } from './sources/api/priority1';
+import { crawlAPI_Priority2 } from './sources/api/priority2';
+import { crawlAPI_Priority3 } from './sources/api/priority3';
+import { crawlRSS_Group1 } from './sources/rss/group1';
+import { crawlRSS_Group2 } from './sources/rss/group2';
+import { crawlSites_Group1 } from './sources/sites/group1';
+import { crawlSites_Group2 } from './sources/sites/group2';
+import { crawlSocial_Group1 } from './sources/social/group1';
+import { crawlSocial_Group2 } from './sources/social/group2';
+import { extractAndClassify } from './sources/extractors';
+import { getEnvConfig } from './sources/config';
 import { deduplicate } from '@otaku-calendar/core';
-import { CrawlerQueue, CrawledItem } from './utils/queue';
-
-const rssFromEnv = process.env.CRAWLER_RSS ? process.env.CRAWLER_RSS.split(',').filter(Boolean) : [];
-const rssFallback = [
-  ...SOURCES.rss.news.map(f => f.url),
-  ...SOURCES.rss.manga.map(f => f.url),
-  ...SOURCES.rss.community.map(f => f.url),
-];
+import { CrawlerQueue, CrawledItem, NormalizedItem } from './utils/queue';
 
 const CRAWLER_CONFIG = {
-  sites: process.env.CRAWLER_SITES ? process.env.CRAWLER_SITES.split(',').filter(Boolean) : SOURCES.sites.news.map(s => s.url),
-  rss: rssFromEnv.length ? rssFromEnv : rssFallback,
-  apis: (process.env.CRAWLER_APIS || '').split(',').filter(Boolean),
-  webtoon: (process.env.CRAWLER_WEBTOON || '').split(',').filter(Boolean),
+  apis: {
+    priority1: ['AniList', 'Jikan', 'Kitsu'],
+    priority2: ['TMDB', 'MangaDex', 'Comick', 'TVmaze', 'Trakt', 'SIMKL'],
+    priority3: ['Other APIs'],
+  },
+  rss: {
+    group1: 'news (141 feeds)',
+    group2: 'manga+community+scanlation (46 feeds)',
+  },
+  sites: {
+    group1: 'news+databases (167 sites)',
+    group2: 'other categories (198 sites)',
+  },
   social: {
-    x: (process.env.CRAWLER_SOCIAL_X || '').split(',').filter(Boolean),
-    instagram: (process.env.CRAWLER_SOCIAL_INSTAGRAM || '').split(',').filter(Boolean),
-    youtube: (process.env.CRAWLER_SOCIAL_YOUTUBE || '').split(',').filter(Boolean),
+    group1: 'Twitter+Reddit+YouTube (290)',
+    group2: 'Discord+TikTok+Facebook+Twitch+Telegram (97)',
   },
 };
 
 async function runCrawler() {
-  console.log('🚀 Starting Otaku Calendar Crawler...');
+  console.log('🚀 Starting Otaku Calendar Crawler (Type-Based)...');
   console.log('⏰ Time:', new Date().toISOString());
   
   const envConfig = getEnvConfig();
   console.log(`📡 Loading sources from config...`);
-  console.log(`   - ${envConfig.apis.split(',').length} APIs configured`);
-  console.log(`   - ${envConfig.sites.split(',').length} sites configured`);
-  console.log(`   - ${envConfig.rss.split(',').length} RSS feeds configured`);
+  console.log(`   - APIs: priority1, priority2, priority3`);
+  console.log(`   - RSS: group1, group2`);
+  console.log(`   - Sites: group1, group2`);
+  console.log(`   - Social: group1, group2`);
 
   const queue = new CrawlerQueue();
 
-  queue.add('Anime', crawlAnime, 1);
-  queue.add('Manga', crawlManga, 1);
-  queue.add('Films', crawlFilms, 2);
-  queue.add('Series', crawlSeries, 2);
-  queue.add('Manhwa', crawlManhwa, 3);
-  queue.add('LiveActions', crawlLiveActions, 3);
-  queue.add('Rumors', crawlRumors, 4);
+  queue.add('API_Priority1', crawlAPI_Priority1, 1, extractAndClassify);
+  queue.add('API_Priority2', crawlAPI_Priority2, 2, extractAndClassify);
+  queue.add('API_Priority3', crawlAPI_Priority3, 3, extractAndClassify);
+  queue.add('RSS_Group1', crawlRSS_Group1, 1, extractAndClassify);
+  queue.add('RSS_Group2', crawlRSS_Group2, 2, extractAndClassify);
+  queue.add('Sites_Group1', crawlSites_Group1, 1, extractAndClassify);
+  queue.add('Sites_Group2', crawlSites_Group2, 2, extractAndClassify);
+  queue.add('Social_Group1', crawlSocial_Group1, 1, extractAndClassify);
+  queue.add('Social_Group2', crawlSocial_Group2, 2, extractAndClassify);
 
   const results = await queue.processAll();
 
-  const counts: Record<string, number> = {
-    Anime: 0,
-    Manga: 0,
-    Films: 0,
-    Series: 0,
-    Manhwa: 0,
-    LiveActions: 0,
-    Rumors: 0,
-  };
+  const normalizedResults = queue.getNormalizedResults();
 
+  const counts: Record<string, number> = {};
   const allResults: CrawledItem[] = [];
+
   results.forEach(result => {
     counts[result.name] = result.items.length;
     allResults.push(...result.items);
@@ -70,32 +70,21 @@ async function runCrawler() {
 
   const total = allResults.length;
   console.log(`\n📊 Crawled ${total} total items`);
-  console.log(`   - Anime: ${counts.Anime}`);
-  console.log(`   - Manga: ${counts.Manga}`);
-  console.log(`   - Films: ${counts.Films}`);
-  console.log(`   - Series: ${counts.Series}`);
-  console.log(`   - Manhwa: ${counts.Manhwa}`);
-  console.log(`   - LiveActions: ${counts.LiveActions}`);
-  console.log(`   - Rumors: ${counts.Rumors}`);
-
-  console.log(`\n🔍 Normalizing ${allResults.length} items...`);
-  const normalized = allResults.map(item => normalize(item));
-
-  console.log('🏷️ Classifying items...');
-  const classified = normalized.map(item => {
-    const classification = classifyItem(item);
-    return { ...item, confidence: classification.confidence, type: classification.type };
+  Object.entries(counts).forEach(([name, count]) => {
+    console.log(`   - ${name}: ${count}`);
   });
 
+  console.log(`\n🔍 Normalized ${normalizedResults.length} items (via extractors)`);
+
   console.log('🔄 Deduplicating...');
-  const { unique, duplicates } = deduplicate(classified);
+  const { unique, duplicates } = deduplicate(normalizedResults as any);
 
   console.log(`\n✅ Final: ${unique.length} unique events (${duplicates} duplicates removed)`);
   
   if (unique.length > 0) {
     console.log('\n📋 Sample events:');
-    unique.slice(0, 3).forEach((event, i) => {
-      console.log(`   ${i + 1}. ${event.anime?.substring(0, 50)}... [${event.type}]`);
+    unique.slice(0, 3).forEach((event: any, i) => {
+      console.log(`   ${i + 1}. ${event.anime?.substring(0, 50)}... [${event.type}] [${event.mediaType || 'unknown'}]`);
     });
   }
   
@@ -114,4 +103,4 @@ if (require.main === module) {
     });
 }
 
-export { runCrawler, CRAWLER_CONFIG, SOURCES };
+export { runCrawler, CRAWLER_CONFIG };

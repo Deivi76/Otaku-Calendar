@@ -7,15 +7,30 @@ export interface CrawledItem {
   publishedAt?: string;
 }
 
+export interface NormalizedItem {
+  anime: string;
+  episode: number | null;
+  date: Date | null;
+  type: 'confirmed' | 'rumor' | 'announcement' | 'live_action';
+  source: string;
+  sourceType: 'api' | 'rss' | 'site' | 'social' | 'community' | 'platform' | 'rumor';
+  confidence: number;
+  url?: string;
+  content?: string;
+  mediaType?: string;
+}
+
 export interface CrawlerJob {
   name: string;
   fn: () => Promise<CrawledItem[]>;
   priority: number;
+  extractorFn?: (items: CrawledItem[]) => Promise<NormalizedItem[]>;
 }
 
 export interface CrawlerResult {
   name: string;
   items: CrawledItem[];
+  normalizedItems?: NormalizedItem[];
   duration: number;
   status: 'success' | 'error';
   error?: string;
@@ -23,10 +38,15 @@ export interface CrawlerResult {
 
 export class CrawlerQueue {
   private jobs: CrawlerJob[] = [];
+  private normalizedResults: NormalizedItem[] = [];
 
-  add(name: string, fn: () => Promise<CrawledItem[]>, priority: number = 0) {
-    this.jobs.push({ name, fn, priority });
+  add(name: string, fn: () => Promise<CrawledItem[]>, priority: number = 0, extractorFn?: (items: CrawledItem[]) => Promise<NormalizedItem[]>) {
+    this.jobs.push({ name, fn, priority, extractorFn });
     this.jobs.sort((a, b) => b.priority - a.priority);
+  }
+
+  getNormalizedResults(): NormalizedItem[] {
+    return this.normalizedResults;
   }
 
   async processAll(): Promise<CrawlerResult[]> {
@@ -47,9 +67,19 @@ export class CrawlerQueue {
 
         console.log(`✅ [${i + 1}/${this.jobs.length}] ${job.name} completed: ${items.length} items in ${duration}ms`);
 
+        let normalizedItems: NormalizedItem[] | undefined;
+        
+        if (job.extractorFn && items.length > 0) {
+          console.log(`🔄 [${i + 1}/${this.jobs.length}] Running extractor for: ${job.name}`);
+          normalizedItems = await job.extractorFn(items);
+          this.normalizedResults.push(...normalizedItems);
+          console.log(`✅ [${i + 1}/${this.jobs.length}] Extractor completed: ${normalizedItems.length} normalized items`);
+        }
+
         results.push({
           name: job.name,
           items,
+          normalizedItems,
           duration,
           status: 'success'
         });
@@ -62,6 +92,7 @@ export class CrawlerQueue {
         results.push({
           name: job.name,
           items: [],
+          normalizedItems: [],
           duration,
           status: 'error',
           error: errorMessage
@@ -76,6 +107,7 @@ export class CrawlerQueue {
 
     const totalDuration = Date.now() - totalStart;
     console.log(`\n📊 Queue completed in ${totalDuration}ms`);
+    console.log(`📊 Total normalized items collected: ${this.normalizedResults.length}`);
 
     return results;
   }

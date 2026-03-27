@@ -1,8 +1,12 @@
 export class CrawlerQueue {
     jobs = [];
-    add(name, fn, priority = 0) {
-        this.jobs.push({ name, fn, priority });
+    normalizedResults = [];
+    add(name, fn, priority = 0, extractorFn) {
+        this.jobs.push({ name, fn, priority, extractorFn });
         this.jobs.sort((a, b) => b.priority - a.priority);
+    }
+    getNormalizedResults() {
+        return this.normalizedResults;
     }
     async processAll() {
         const results = [];
@@ -16,9 +20,17 @@ export class CrawlerQueue {
                 const items = await job.fn();
                 const duration = Date.now() - jobStart;
                 console.log(`✅ [${i + 1}/${this.jobs.length}] ${job.name} completed: ${items.length} items in ${duration}ms`);
+                let normalizedItems;
+                if (job.extractorFn && items.length > 0) {
+                    console.log(`🔄 [${i + 1}/${this.jobs.length}] Running extractor for: ${job.name}`);
+                    normalizedItems = await job.extractorFn(items);
+                    this.normalizedResults.push(...normalizedItems);
+                    console.log(`✅ [${i + 1}/${this.jobs.length}] Extractor completed: ${normalizedItems.length} normalized items`);
+                }
                 results.push({
                     name: job.name,
                     items,
+                    normalizedItems,
                     duration,
                     status: 'success'
                 });
@@ -30,6 +42,7 @@ export class CrawlerQueue {
                 results.push({
                     name: job.name,
                     items: [],
+                    normalizedItems: [],
                     duration,
                     status: 'error',
                     error: errorMessage
@@ -42,6 +55,7 @@ export class CrawlerQueue {
         }
         const totalDuration = Date.now() - totalStart;
         console.log(`\n📊 Queue completed in ${totalDuration}ms`);
+        console.log(`📊 Total normalized items collected: ${this.normalizedResults.length}`);
         return results;
     }
     delay(ms) {
