@@ -1,5 +1,5 @@
 import { SOURCES_DATABASE } from '@otaku-calendar/core';
-import type { Source } from '@otaku-calendar/core';
+import type { Source, ApiSource, RssSource, SiteSource, SocialSource } from '@otaku-calendar/core';
 
 export interface SourceConfig {
   name: string;
@@ -10,13 +10,23 @@ export interface SourceConfig {
 }
 
 function convertToSourceConfig(sources: Source[], type: 'api' | 'rss' | 'site' | 'social', category: string): SourceConfig[] {
-  return sources.map((source) => ({
-    name: source.name,
-    url: source.url || '',
-    type,
-    category,
-    reliability: source.reliability,
-  }));
+  return sources.map((source) => {
+    let url = '';
+    if ('url' in source && source.url) {
+      url = source.url;
+    } else if ('handle' in source && source.handle) {
+      url = `https://twitter.com/${source.handle}`;
+    } else if ('invite' in source && source.invite) {
+      url = `https://discord.gg/${source.invite}`;
+    }
+    return {
+      name: source.name,
+      url,
+      type,
+      category,
+      reliability: source.reliability,
+    };
+  });
 }
 
 function getAllSourcesByType(type: 'api' | 'rss' | 'site' | 'social'): SourceConfig[] {
@@ -47,23 +57,30 @@ export function getSourcesByType(type: 'api' | 'rss' | 'site' | 'social'): Sourc
   return getAllSourcesByType(type);
 }
 
+export function getSourcesByTypeAndGroup(
+  type: 'api' | 'rss' | 'site' | 'social',
+  group: string
+): SourceConfig[] {
+  if (type === 'api' && group in SOURCES_DATABASE.apis) {
+    return convertToSourceConfig(SOURCES_DATABASE.apis[group as keyof typeof SOURCES_DATABASE.apis] as unknown as Source[], 'api', group);
+  }
+  if (type === 'rss' && group in SOURCES_DATABASE.rss) {
+    return convertToSourceConfig(SOURCES_DATABASE.rss[group as keyof typeof SOURCES_DATABASE.rss] as unknown as Source[], 'rss', group);
+  }
+  if (type === 'site' && group in SOURCES_DATABASE.sites) {
+    return convertToSourceConfig(SOURCES_DATABASE.sites[group as keyof typeof SOURCES_DATABASE.sites] as unknown as Source[], 'site', group);
+  }
+  if (type === 'social' && group in SOURCES_DATABASE.social) {
+    return convertToSourceConfig(SOURCES_DATABASE.social[group as keyof typeof SOURCES_DATABASE.social] as unknown as Source[], 'social', group);
+  }
+  return [];
+}
+
 export function getSourcesByTypeAndCategory(
   type: 'api' | 'rss' | 'site' | 'social',
   category: string
 ): SourceConfig[] {
-  if (type === 'api' && category in SOURCES_DATABASE.apis) {
-    return convertToSourceConfig(SOURCES_DATABASE.apis[category as keyof typeof SOURCES_DATABASE.apis] as unknown as Source[], 'api', category);
-  }
-  if (type === 'rss' && category in SOURCES_DATABASE.rss) {
-    return convertToSourceConfig(SOURCES_DATABASE.rss[category as keyof typeof SOURCES_DATABASE.rss] as unknown as Source[], 'rss', category);
-  }
-  if (type === 'site' && category in SOURCES_DATABASE.sites) {
-    return convertToSourceConfig(SOURCES_DATABASE.sites[category as keyof typeof SOURCES_DATABASE.sites] as unknown as Source[], 'site', category);
-  }
-  if (type === 'social' && category in SOURCES_DATABASE.social) {
-    return convertToSourceConfig(SOURCES_DATABASE.social[category as keyof typeof SOURCES_DATABASE.social] as unknown as Source[], 'social', category);
-  }
-  return [];
+  return getSourcesByTypeAndGroup(type, category);
 }
 
 export function getRSSSources(): SourceConfig[] {
@@ -80,25 +97,6 @@ export function getSourcesByReliability(minReliability: number): SourceConfig[] 
   return allSources.filter((source) => source.reliability >= minReliability);
 }
 
-export function getSourcesByCategory(category: 'anime' | 'manga' | 'manhwa' | 'film' | 'series' | 'liveAction'): SourceConfig[] {
-  const sources: SourceConfig[] = [];
-  
-  if (category in SOURCES_DATABASE.apis) {
-    sources.push(...convertToSourceConfig(SOURCES_DATABASE.apis[category as keyof typeof SOURCES_DATABASE.apis] as unknown as Source[], 'api', category));
-  }
-  if (category in SOURCES_DATABASE.rss) {
-    sources.push(...convertToSourceConfig(SOURCES_DATABASE.rss[category as keyof typeof SOURCES_DATABASE.rss] as unknown as Source[], 'rss', category));
-  }
-  if (category in SOURCES_DATABASE.sites) {
-    sources.push(...convertToSourceConfig(SOURCES_DATABASE.sites[category as keyof typeof SOURCES_DATABASE.sites] as unknown as Source[], 'site', category));
-  }
-  if (category in SOURCES_DATABASE.social) {
-    sources.push(...convertToSourceConfig(SOURCES_DATABASE.social[category as keyof typeof SOURCES_DATABASE.social] as unknown as Source[], 'social', category));
-  }
-  
-  return sources;
-}
-
 export interface CrawlerSourceConfig {
   apis: SourceConfig[];
   rss: SourceConfig[];
@@ -106,83 +104,52 @@ export interface CrawlerSourceConfig {
   social: SourceConfig[];
 }
 
-export function getAnimeSources(): CrawlerSourceConfig {
+export function getHighPrioritySources(): CrawlerSourceConfig {
   return {
-    apis: getSourcesByTypeAndCategory('api', 'anime'),
-    rss: getSourcesByTypeAndCategory('rss', 'anime'),
-    sites: getSourcesByTypeAndCategory('site', 'anime'),
-    social: getSourcesByTypeAndCategory('social', 'anime'),
+    apis: getSourcesByTypeAndGroup('api', 'priority1'),
+    rss: getSourcesByTypeAndGroup('rss', 'group1'),
+    sites: getSourcesByTypeAndGroup('site', 'group1'),
+    social: getSourcesByTypeAndGroup('social', 'group1'),
   };
 }
 
-export function getMangaSources(): CrawlerSourceConfig {
+export function getMediumPrioritySources(): CrawlerSourceConfig {
   return {
-    apis: getSourcesByTypeAndCategory('api', 'manga'),
-    rss: getSourcesByTypeAndCategory('rss', 'manga'),
-    sites: getSourcesByTypeAndCategory('site', 'manga'),
-    social: getSourcesByTypeAndCategory('social', 'manga'),
+    apis: getSourcesByTypeAndGroup('api', 'priority2'),
+    rss: getSourcesByTypeAndGroup('rss', 'group2'),
+    sites: getSourcesByTypeAndGroup('site', 'group2'),
+    social: getSourcesByTypeAndGroup('social', 'group2'),
   };
 }
 
-export function getManhwaSources(): CrawlerSourceConfig {
-  return {
-    apis: getSourcesByTypeAndCategory('api', 'manhwa'),
-    rss: getSourcesByTypeAndCategory('rss', 'manhwa'),
-    sites: getSourcesByTypeAndCategory('site', 'manhwa'),
-    social: getSourcesByTypeAndCategory('social', 'manhwa'),
-  };
+export function getAllAPISources(): SourceConfig[] {
+  return getSourcesByType('api');
 }
 
-export function getFilmSources(): CrawlerSourceConfig {
-  return {
-    apis: getSourcesByTypeAndCategory('api', 'film'),
-    rss: getSourcesByTypeAndCategory('rss', 'film'),
-    sites: getSourcesByTypeAndCategory('site', 'film'),
-    social: getSourcesByTypeAndCategory('social', 'film'),
-  };
+export function getAllRSSSources(): SourceConfig[] {
+  return getSourcesByType('rss');
 }
 
-export function getSeriesSources(): CrawlerSourceConfig {
-  return {
-    apis: getSourcesByTypeAndCategory('api', 'series'),
-    rss: getSourcesByTypeAndCategory('rss', 'series'),
-    sites: getSourcesByTypeAndCategory('site', 'series'),
-    social: getSourcesByTypeAndCategory('social', 'series'),
-  };
+export function getAllSiteSources(): SourceConfig[] {
+  return getSourcesByType('site');
 }
 
-export function getLiveActionSources(): CrawlerSourceConfig {
-  return {
-    apis: getSourcesByTypeAndCategory('api', 'liveAction'),
-    rss: getSourcesByTypeAndCategory('rss', 'liveAction'),
-    sites: getSourcesByTypeAndCategory('site', 'liveAction'),
-    social: getSourcesByTypeAndCategory('social', 'liveAction'),
-  };
+export function getAllSocialSources(): SourceConfig[] {
+  return getSourcesByType('social');
 }
 
-export function getChineseSources(): CrawlerSourceConfig {
-  return {
-    apis: getSourcesByTypeAndCategory('api', 'chinese'),
-    rss: getSourcesByTypeAndCategory('rss', 'chinese'),
-    sites: getSourcesByTypeAndCategory('site', 'chinese'),
-    social: getSourcesByTypeAndCategory('social', 'chinese'),
-  };
+export function getSourcesByMinimumReliability(type: 'api' | 'rss' | 'site' | 'social', minReliability: number): SourceConfig[] {
+  const sources = getSourcesByType(type);
+  return sources.filter(source => source.reliability >= minReliability);
 }
 
-export function getJapaneseSources(): CrawlerSourceConfig {
-  return {
-    apis: getSourcesByTypeAndCategory('api', 'japanese'),
-    rss: getSourcesByTypeAndCategory('rss', 'japanese'),
-    sites: getSourcesByTypeAndCategory('site', 'japanese'),
-    social: getSourcesByTypeAndCategory('social', 'japanese'),
-  };
+export function getAPISourcesByPriority(priority: 'priority1' | 'priority2' | 'priority3'): SourceConfig[] {
+  return getSourcesByTypeAndGroup('api', priority);
 }
 
-export function getRumorsSources(): CrawlerSourceConfig {
-  return {
-    apis: [],
-    rss: getSourcesByTypeAndCategory('rss', 'rumors'),
-    sites: getSourcesByTypeAndCategory('site', 'rumors'),
-    social: getSourcesByTypeAndCategory('social', 'rumors'),
-  };
+export function getSourcesByGroup(
+  type: 'rss' | 'site' | 'social',
+  group: 'group1' | 'group2'
+): SourceConfig[] {
+  return getSourcesByTypeAndGroup(type, group);
 }

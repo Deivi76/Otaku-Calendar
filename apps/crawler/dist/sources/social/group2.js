@@ -1,8 +1,6 @@
-import { getSourcesByTypeAndCategory } from '../manager';
-function getFilteredSources(category) {
-    return getSourcesByTypeAndCategory('social', category)
-        .filter((source) => source.reliability >= 0.5)
-        .slice(0, 20);
+import { getSourcesByTypeAndGroup } from '../manager';
+function getFilteredSources() {
+    return getSourcesByTypeAndGroup('social', 'group2');
 }
 async function fetchDiscordGroup2(sources) {
     if (sources.length === 0)
@@ -206,11 +204,12 @@ async function fetchTelegramGroup2(sources) {
     return results;
 }
 export async function crawlSocial_Group2() {
-    const discordSources = getFilteredSources('discord');
-    const tiktokSources = getFilteredSources('tiktok');
-    const facebookSources = getFilteredSources('facebook');
-    const twitchSources = getFilteredSources('twitch');
-    const telegramSources = getFilteredSources('telegram');
+    const sources = getFilteredSources();
+    const discordSources = sources.filter(s => s.url?.includes('discord') || 'invite' in s);
+    const tiktokSources = sources.filter(s => s.url?.includes('tiktok'));
+    const facebookSources = sources.filter(s => s.url?.includes('facebook'));
+    const twitchSources = sources.filter(s => s.url?.includes('twitch'));
+    const telegramSources = sources.filter(s => s.url?.includes('t.me'));
     const [discordResults, tiktokResults, facebookResults, twitchResults, telegramResults] = await Promise.all([
         fetchDiscordGroup2(discordSources),
         fetchTikTokGroup2(tiktokSources),

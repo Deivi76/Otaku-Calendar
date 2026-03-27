@@ -1,25 +1,10 @@
 import { crawlSites, CrawledItem } from '../sites';
-import { getSourcesByTypeAndCategory } from '../manager';
+import { getSourcesByTypeAndGroup } from '../manager';
 
 export async function crawlSites_Group2(): Promise<CrawledItem[]> {
-  const manhwaSources = getSourcesByTypeAndCategory('site', 'manhwa');
-  const streamingSources = getSourcesByTypeAndCategory('site', 'streaming');
-  const filmSources = getSourcesByTypeAndCategory('site', 'film');
-  const liveActionSources = getSourcesByTypeAndCategory('site', 'liveAction');
-  const mangaSources = getSourcesByTypeAndCategory('site', 'manga');
-  const communitySources = getSourcesByTypeAndCategory('site', 'community');
-
-  const allSources = [
-    ...manhwaSources,
-    ...streamingSources,
-    ...filmSources,
-    ...liveActionSources,
-    ...mangaSources,
-    ...communitySources,
-  ];
+  const allSources = getSourcesByTypeAndGroup('site', 'group2');
 
   const filteredSources = allSources
-    .filter(source => source.reliability >= 0.6)
     .sort((a, b) => b.reliability - a.reliability)
     .slice(0, 50);
 

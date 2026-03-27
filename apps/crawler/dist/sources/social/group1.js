@@ -1,8 +1,6 @@
-import { getSourcesByTypeAndCategory } from '../manager';
-function getFilteredSources(category) {
-    return getSourcesByTypeAndCategory('social', category)
-        .filter((source) => source.reliability >= 0.6)
-        .slice(0, 40);
+import { getSourcesByTypeAndGroup } from '../manager';
+function getFilteredSources() {
+    return getSourcesByTypeAndGroup('social', 'group1');
 }
 async function fetchTwitterGroup1(sources) {
     if (sources.length === 0)
@@ -110,9 +108,10 @@ async function fetchYouTubeGroup1(sources) {
     return results;
 }
 export async function crawlSocial_Group1() {
-    const twitterSources = getFilteredSources('twitter');
-    const redditSources = getFilteredSources('reddit');
-    const youtubeSources = getFilteredSources('youtube');
+    const sources = getFilteredSources();
+    const twitterSources = sources.filter(s => s.url?.includes('twitter.com') || 'handle' in s);
+    const redditSources = sources.filter(s => s.url?.includes('reddit.com'));
+    const youtubeSources = sources.filter(s => s.url?.includes('youtube.com'));
     const [twitterResults, redditResults, youtubeResults] = await Promise.all([
         fetchTwitterGroup1(twitterSources),
         fetchRedditGroup1(redditSources),

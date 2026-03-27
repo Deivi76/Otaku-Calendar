@@ -1,14 +1,12 @@
-import { getSourcesByTypeAndCategory, type SourceConfig } from '../manager';
+import { getSourcesByTypeAndGroup, type SourceConfig } from '../manager';
 import type { CrawledItem } from '../social';
 
 interface SocialSource extends SourceConfig {
   handle?: string;
 }
 
-function getFilteredSources(category: 'twitter' | 'reddit' | 'youtube'): SocialSource[] {
-  return getSourcesByTypeAndCategory('social', category)
-    .filter((source): source is SocialSource => source.reliability >= 0.6)
-    .slice(0, 40);
+function getFilteredSources(): SocialSource[] {
+  return getSourcesByTypeAndGroup('social', 'group1') as SocialSource[];
 }
 
 async function fetchTwitterGroup1(sources: SocialSource[]): Promise<CrawledItem[]> {
@@ -140,9 +138,11 @@ async function fetchYouTubeGroup1(sources: SocialSource[]): Promise<CrawledItem[
 }
 
 export async function crawlSocial_Group1(): Promise<CrawledItem[]> {
-  const twitterSources = getFilteredSources('twitter');
-  const redditSources = getFilteredSources('reddit');
-  const youtubeSources = getFilteredSources('youtube');
+  const sources = getFilteredSources();
+  
+  const twitterSources = sources.filter(s => s.url?.includes('twitter.com') || 'handle' in s);
+  const redditSources = sources.filter(s => s.url?.includes('reddit.com'));
+  const youtubeSources = sources.filter(s => s.url?.includes('youtube.com'));
 
   const [twitterResults, redditResults, youtubeResults] = await Promise.all([
     fetchTwitterGroup1(twitterSources),

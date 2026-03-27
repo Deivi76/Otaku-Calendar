@@ -1,5 +1,5 @@
 import { crawlRSS } from '../rss';
-import { getSourcesByTypeAndCategory, type SourceConfig } from '../manager';
+import { getSourcesByTypeAndGroup, type SourceConfig } from '../manager';
 
 export interface CrawledItem {
   title: string;
@@ -21,17 +21,10 @@ async function fetchRSS(source: SourceConfig): Promise<CrawledItem[]> {
 }
 
 export async function crawlRSS_Group2(): Promise<CrawledItem[]> {
-  const mangaSources = getSourcesByTypeAndCategory('rss', 'manga');
-  const communitySources = getSourcesByTypeAndCategory('rss', 'community');
-  const scanlationSources = getSourcesByTypeAndCategory('rss', 'scanlation');
-  
-  const allSources = [...mangaSources, ...communitySources, ...scanlationSources];
-  
-  const filteredSources = allSources
-    .filter(source => source.reliability >= 0.6);
+  const allSources = getSourcesByTypeAndGroup('rss', 'group2');
   
   const results = await Promise.all(
-    filteredSources.map(source => fetchRSS(source))
+    allSources.map(source => fetchRSS(source))
   );
   
   return results.flat();

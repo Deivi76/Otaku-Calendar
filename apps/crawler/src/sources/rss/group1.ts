@@ -1,5 +1,5 @@
 import { crawlRSS } from '../rss';
-import { getSourcesByTypeAndCategory, type SourceConfig } from '../manager';
+import { getSourcesByTypeAndGroup, type SourceConfig } from '../manager';
 
 export interface CrawledItem {
   title: string;
@@ -21,13 +21,10 @@ async function fetchRSS(source: SourceConfig): Promise<CrawledItem[]> {
 }
 
 export async function crawlRSS_Group1(): Promise<CrawledItem[]> {
-  const allNewsSources = getSourcesByTypeAndCategory('rss', 'news');
-  const filteredSources = allNewsSources
-    .filter(source => source.reliability >= 0.7)
-    .slice(0, 50);
+  const allNewsSources = getSourcesByTypeAndGroup('rss', 'group1');
   
   const results = await Promise.all(
-    filteredSources.map(source => fetchRSS(source))
+    allNewsSources.slice(0, 50).map(source => fetchRSS(source))
   );
   
   return results.flat();

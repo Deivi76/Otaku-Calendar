@@ -1,14 +1,13 @@
-import { getSourcesByTypeAndCategory, type SourceConfig } from '../manager';
+import { getSourcesByTypeAndGroup, type SourceConfig } from '../manager';
 import type { CrawledItem } from '../social';
 
 interface SocialSource extends SourceConfig {
   handle?: string;
+  invite?: string;
 }
 
-function getFilteredSources(category: 'discord' | 'tiktok' | 'facebook' | 'twitch' | 'telegram'): SocialSource[] {
-  return getSourcesByTypeAndCategory('social', category)
-    .filter((source): source is SocialSource => source.reliability >= 0.5)
-    .slice(0, 20);
+function getFilteredSources(): SocialSource[] {
+  return getSourcesByTypeAndGroup('social', 'group2') as SocialSource[];
 }
 
 async function fetchDiscordGroup2(sources: SocialSource[]): Promise<CrawledItem[]> {
@@ -251,11 +250,13 @@ async function fetchTelegramGroup2(sources: SocialSource[]): Promise<CrawledItem
 }
 
 export async function crawlSocial_Group2(): Promise<CrawledItem[]> {
-  const discordSources = getFilteredSources('discord');
-  const tiktokSources = getFilteredSources('tiktok');
-  const facebookSources = getFilteredSources('facebook');
-  const twitchSources = getFilteredSources('twitch');
-  const telegramSources = getFilteredSources('telegram');
+  const sources = getFilteredSources();
+  
+  const discordSources = sources.filter(s => s.url?.includes('discord') || 'invite' in s);
+  const tiktokSources = sources.filter(s => s.url?.includes('tiktok'));
+  const facebookSources = sources.filter(s => s.url?.includes('facebook'));
+  const twitchSources = sources.filter(s => s.url?.includes('twitch'));
+  const telegramSources = sources.filter(s => s.url?.includes('t.me'));
 
   const [discordResults, tiktokResults, facebookResults, twitchResults, telegramResults] = await Promise.all([
     fetchDiscordGroup2(discordSources),

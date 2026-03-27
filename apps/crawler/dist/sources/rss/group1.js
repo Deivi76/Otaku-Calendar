@@ -1,5 +1,5 @@
 import { crawlRSS } from '../rss';
-import { getSourcesByTypeAndCategory } from '../manager';
+import { getSourcesByTypeAndGroup } from '../manager';
 async function fetchRSS(source) {
     if (!source.url)
         return [];
@@ -12,10 +12,7 @@ async function fetchRSS(source) {
     }
 }
 export async function crawlRSS_Group1() {
-    const allNewsSources = getSourcesByTypeAndCategory('rss', 'news');
-    const filteredSources = allNewsSources
-        .filter(source => source.reliability >= 0.7)
-        .slice(0, 50);
-    const results = await Promise.all(filteredSources.map(source => fetchRSS(source)));
+    const allNewsSources = getSourcesByTypeAndGroup('rss', 'group1');
+    const results = await Promise.all(allNewsSources.slice(0, 50).map(source => fetchRSS(source)));
     return results.flat();
 }

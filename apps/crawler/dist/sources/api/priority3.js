@@ -1,4 +1,4 @@
-import { getSourcesByTypeAndCategory } from '../manager';
+import { getSourcesByTypeAndGroup } from '../manager';
 async function fetchFromApi(api) {
     try {
         const res = await fetch(api.url, {
@@ -26,8 +26,7 @@ async function fetchFromApi(api) {
     }
 }
 export async function crawlAPI_Priority3() {
-    const animeApis = getSourcesByTypeAndCategory('api', 'anime');
-    const secondaryApis = animeApis.filter(api => api.reliability < 0.75);
-    const results = await Promise.all(secondaryApis.slice(0, 20).map(api => fetchFromApi(api)));
+    const animeApis = getSourcesByTypeAndGroup('api', 'priority3');
+    const results = await Promise.all(animeApis.slice(0, 20).map(api => fetchFromApi(api)));
     return results.flat();
 }

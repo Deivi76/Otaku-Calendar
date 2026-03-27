@@ -1,4 +1,4 @@
-import { getSourcesByTypeAndCategory, type SourceConfig } from '../manager';
+import { getSourcesByTypeAndGroup, type SourceConfig } from '../manager';
 import type { CrawledItem } from '../../utils/queue';
 
 async function fetchFromApi(api: SourceConfig): Promise<CrawledItem[]> {
@@ -33,11 +33,10 @@ async function fetchFromApi(api: SourceConfig): Promise<CrawledItem[]> {
 }
 
 export async function crawlAPI_Priority3(): Promise<CrawledItem[]> {
-  const animeApis = getSourcesByTypeAndCategory('api', 'anime');
-  const secondaryApis = animeApis.filter(api => api.reliability < 0.75);
+  const animeApis = getSourcesByTypeAndGroup('api', 'priority3');
   
   const results = await Promise.all(
-    secondaryApis.slice(0, 20).map(api => fetchFromApi(api))
+    animeApis.slice(0, 20).map(api => fetchFromApi(api))
   );
   
   return results.flat();
