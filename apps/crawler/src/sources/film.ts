@@ -1,3 +1,8 @@
+import { getFilmSources } from './manager';
+import type { SourceConfig } from './manager';
+import { crawlRSS } from './rss';
+import { crawlSite } from './sites';
+
 export interface CrawledItem {
   title: string;
   content: string;
@@ -354,45 +359,56 @@ async function fetchJapaneseCinema(): Promise<CrawledItem[]> {
   }
 }
 
+async function fetchFromAPI(api: SourceConfig): Promise<CrawledItem[]> {
+  try {
+    if (api.url.includes('themoviedb.org') || api.url.includes('tmdb')) {
+      return tmbdDiscoverMovies() as unknown as Promise<CrawledItem[]>;
+    }
+    if (api.url.includes('omdbapi.com')) {
+      return fetchOMDb('anime movie') as unknown as Promise<CrawledItem[]>;
+    }
+    if (api.url.includes('jikan.moe')) {
+      return fetchJikanMovies() as unknown as Promise<CrawledItem[]>;
+    }
+    if (api.url.includes('anilist.co')) {
+      return fetchAniListMovies() as unknown as Promise<CrawledItem[]>;
+    }
+    if (api.url.includes('kitsu.io')) {
+      return fetchKitsuMovies() as unknown as Promise<CrawledItem[]>;
+    }
+    if (api.url.includes('animethemes.moe')) {
+      return fetchAnimeThemesMovies() as unknown as Promise<CrawledItem[]>;
+    }
+    if (api.url.includes('trakt.tv')) {
+      return fetchTraktMovies() as unknown as Promise<CrawledItem[]>;
+    }
+    return [];
+  } catch (error) {
+    console.error(`Error fetching from API ${api.name}:`, error);
+    return [];
+  }
+}
+
+async function fetchRSS(rss: SourceConfig): Promise<CrawledItem[]> {
+  if (!rss.url) return [];
+  return crawlRSS(rss.url) as unknown as Promise<CrawledItem[]>;
+}
+
+async function fetchSite(site: SourceConfig): Promise<CrawledItem[]> {
+  if (!site.url) return [];
+  return crawlSite(site.url) as unknown as Promise<CrawledItem[]>;
+}
+
 export async function crawlFilms(): Promise<CrawledItem[]> {
-  const [tmbdMovies, tmbdSearch, omdb, jikan, anilist, kitsu, themes, trakt, letterboxd, annict, jpCinema] = await Promise.all([
-    tmbdDiscoverMovies(1),
-    tmdbSearchAnimeMovies('anime'),
-    fetchOMDb('anime movie'),
-    fetchJikanMovies(),
-    fetchAniListMovies(),
-    fetchKitsuMovies(),
-    fetchAnimeThemesMovies(),
-    fetchTraktMovies(),
-    fetchLetterboxdRss(),
-    fetchAnnictRss(),
-    fetchJapaneseCinema(),
+  const sources = getFilmSources();
+  
+  const results = await Promise.all([
+    ...sources.apis.map(api => fetchFromAPI(api)),
+    ...sources.rss.map(rss => fetchRSS(rss)),
+    ...sources.sites.map(site => fetchSite(site)),
   ]);
   
-  const allResults = [
-    ...tmbdMovies,
-    ...tmbdSearch,
-    ...omdb,
-    ...jikan,
-    ...anilist,
-    ...kitsu,
-    ...themes,
-    ...trakt,
-    ...letterboxd,
-    ...annict,
-    ...jpCinema,
-  ];
-  
-  const uniqueMap = new Map<string, CrawledItem>();
-  
-  for (const item of allResults) {
-    const key = item.title.toLowerCase().trim();
-    if (!uniqueMap.has(key)) {
-      uniqueMap.set(key, item);
-    }
-  }
-  
-  return Array.from(uniqueMap.values());
+  return results.flat();
 }
 
 export async function crawlFilmsByGenre(genre: string): Promise<CrawledItem[]> {

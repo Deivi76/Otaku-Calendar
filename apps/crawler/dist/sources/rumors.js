@@ -1,40 +1,11 @@
 import * as cheerio from 'cheerio';
+import { getRumorsSources } from './manager';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-const RUMOR_SOURCES = {
-    sites: {
-        worstGen: 'https://worstgen.com',
-        onePieceSpoiler: 'https://onepiece.fandom.com/wiki/One_Piece_Spoilers',
-        mangaPredictions: 'https://mangapredictions.com',
-        arlongPark: 'https://arlongpark.net',
-        cubariMoe: 'https://cubari.moe',
-    },
-    fourChan: {
-        animeBoard: 'a',
-        visualNovels: 'vr',
-    },
-    twitter: [
-        'SugoiLITE',
-        'MangaMoguraRE',
-        'WorstGen',
-        'Mugiwara_23',
-        'mangaraw_jp',
-    ],
-    youtube: [
-        'Hassan Javed',
-        'Anime Hearsay',
-        'Otaku Kart',
-    ],
-    forums: {
-        reddit: [
-            'r/MangaCollectors',
-            'r/Kagurabachi',
-        ],
-        myAnimeList: 'https://myanimelist.net/forum',
-    },
-};
-async function fetchWorstGen() {
+async function fetchWorstGen(sources) {
     try {
-        const html = await fetch(RUMOR_SOURCES.sites.worstGen, {
+        const source = sources.find(s => s.name.toLowerCase().includes('worstgen'));
+        const url = source?.url || 'https://worstgen.com';
+        const html = await fetch(url, {
             signal: AbortSignal.timeout(10000),
             headers: { 'User-Agent': USER_AGENT },
         }).then(r => r.text());
@@ -65,9 +36,11 @@ async function fetchWorstGen() {
         return [];
     }
 }
-async function fetchOnePieceSpoiler() {
+async function fetchOnePieceSpoiler(sources) {
     try {
-        const html = await fetch(RUMOR_SOURCES.sites.onePieceSpoiler, {
+        const source = sources.find(s => s.name.toLowerCase().includes('one piece') || s.name.toLowerCase().includes('spoiler'));
+        const url = source?.url || 'https://onepiece.fandom.com/wiki/One_Piece_Spoilers';
+        const html = await fetch(url, {
             signal: AbortSignal.timeout(10000),
             headers: { 'User-Agent': USER_AGENT },
         }).then(r => r.text());
@@ -94,9 +67,11 @@ async function fetchOnePieceSpoiler() {
         return [];
     }
 }
-async function fetchArlongPark() {
+async function fetchArlongPark(sources) {
     try {
-        const html = await fetch(RUMOR_SOURCES.sites.arlongPark, {
+        const source = sources.find(s => s.name.toLowerCase().includes('arlong'));
+        const url = source?.url || 'https://arlongpark.net';
+        const html = await fetch(url, {
             signal: AbortSignal.timeout(10000),
             headers: { 'User-Agent': USER_AGENT },
         }).then(r => r.text());
@@ -202,9 +177,11 @@ async function fetchRedditForum(subreddit) {
         return [];
     }
 }
-async function fetchMALForums() {
+async function fetchMALForums(sources) {
     try {
-        const html = await fetch(RUMOR_SOURCES.forums.myAnimeList, {
+        const source = sources.find(s => s.name.toLowerCase().includes('myanimelist') || s.name.toLowerCase().includes('mal'));
+        const url = source?.url || 'https://myanimelist.net/forum';
+        const html = await fetch(url, {
             signal: AbortSignal.timeout(10000),
             headers: { 'User-Agent': USER_AGENT },
         }).then(r => r.text());
@@ -233,9 +210,12 @@ async function fetchMALForums() {
         return [];
     }
 }
-async function fetchLeakerTwitter() {
+async function fetchLeakerTwitter(sources) {
     const items = [];
-    const twitterHandles = RUMOR_SOURCES.twitter;
+    const twitterHandles = sources.filter(s => s.url).map(s => s.name.replace('@', ''));
+    if (twitterHandles.length === 0) {
+        return [];
+    }
     for (const handle of twitterHandles) {
         try {
             const url = `https://nitter.net/${handle}`;
@@ -270,8 +250,8 @@ async function fetchLeakerTwitter() {
     }
     return items.slice(0, 20);
 }
-async function fetchLeakYouTubers() {
-    const channels = RUMOR_SOURCES.youtube;
+async function fetchLeakYouTubers(sources) {
+    const channels = sources.map(s => s.name);
     const items = [];
     for (const channel of channels) {
         try {
@@ -358,9 +338,11 @@ async function fetchTelegramChannels() {
     }
     return items.slice(0, 10);
 }
-async function fetchCubariMoe() {
+async function fetchCubariMoe(sources) {
     try {
-        const html = await fetch(RUMOR_SOURCES.sites.cubariMoe, {
+        const source = sources.find(s => s.name.toLowerCase().includes('cubari'));
+        const url = source?.url || 'https://cubari.moe';
+        const html = await fetch(url, {
             signal: AbortSignal.timeout(10000),
             headers: { 'User-Agent': USER_AGENT },
         }).then(r => r.text());
@@ -389,9 +371,11 @@ async function fetchCubariMoe() {
         return [];
     }
 }
-async function fetchMangaPredictions() {
+async function fetchMangaPredictions(sources) {
     try {
-        const html = await fetch(RUMOR_SOURCES.sites.mangaPredictions, {
+        const source = sources.find(s => s.name.toLowerCase().includes('prediction'));
+        const url = source?.url || 'https://mangapredictions.com';
+        const html = await fetch(url, {
             signal: AbortSignal.timeout(10000),
             headers: { 'User-Agent': USER_AGENT },
         }).then(r => r.text());
@@ -429,20 +413,23 @@ export function markAsRumor(items) {
 }
 export async function crawlRumors() {
     console.log('🔍 Crawling rumor sources (Tier 4-5)...');
+    const sources = getRumorsSources();
+    const siteUrls = sources.sites.map(s => ({ name: s.name, url: s.url }));
+    const socialUrls = sources.social.map(s => ({ name: s.name, url: s.url }));
     const [worstGenItems, onePieceItems, arlongParkItems, fourChanAItems, fourChanVrItems, redditMangaCollectors, redditKagurabachi, malForums, twitterLeaks, youtubeLeaks, telegramItems, cubariItems, predictionsItems,] = await Promise.all([
-        fetchWorstGen(),
-        fetchOnePieceSpoiler(),
-        fetchArlongPark(),
+        fetchWorstGen(siteUrls),
+        fetchOnePieceSpoiler(siteUrls),
+        fetchArlongPark(siteUrls),
         fetch4chanAnime(),
         fetch4chanVN(),
         fetchRedditForum('r/MangaCollectors'),
         fetchRedditForum('r/Kagurabachi'),
-        fetchMALForums(),
-        fetchLeakerTwitter(),
-        fetchLeakYouTubers(),
+        fetchMALForums(siteUrls),
+        fetchLeakerTwitter(socialUrls),
+        fetchLeakYouTubers(socialUrls),
         fetchTelegramChannels(),
-        fetchCubariMoe(),
-        fetchMangaPredictions(),
+        fetchCubariMoe(siteUrls),
+        fetchMangaPredictions(siteUrls),
     ]);
     const allResults = [
         ...worstGenItems,

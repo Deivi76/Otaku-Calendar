@@ -1,3 +1,6 @@
+import { getFilmSources } from './manager';
+import { crawlRSS } from './rss';
+import { crawlSite } from './sites';
 const TMDB_API = process.env.TMDB_API || 'https://api.themoviedb.org/3';
 const TMDB_KEY = process.env.TMDB_API_KEY;
 const OMDB_API = process.env.OMDB_API || 'http://www.omdbapi.com';
@@ -314,41 +317,54 @@ async function fetchJapaneseCinema() {
         return [];
     }
 }
-export async function crawlFilms() {
-    const [tmbdMovies, tmbdSearch, omdb, jikan, anilist, kitsu, themes, trakt, letterboxd, annict, jpCinema] = await Promise.all([
-        tmbdDiscoverMovies(1),
-        tmdbSearchAnimeMovies('anime'),
-        fetchOMDb('anime movie'),
-        fetchJikanMovies(),
-        fetchAniListMovies(),
-        fetchKitsuMovies(),
-        fetchAnimeThemesMovies(),
-        fetchTraktMovies(),
-        fetchLetterboxdRss(),
-        fetchAnnictRss(),
-        fetchJapaneseCinema(),
-    ]);
-    const allResults = [
-        ...tmbdMovies,
-        ...tmbdSearch,
-        ...omdb,
-        ...jikan,
-        ...anilist,
-        ...kitsu,
-        ...themes,
-        ...trakt,
-        ...letterboxd,
-        ...annict,
-        ...jpCinema,
-    ];
-    const uniqueMap = new Map();
-    for (const item of allResults) {
-        const key = item.title.toLowerCase().trim();
-        if (!uniqueMap.has(key)) {
-            uniqueMap.set(key, item);
+async function fetchFromAPI(api) {
+    try {
+        if (api.url.includes('themoviedb.org') || api.url.includes('tmdb')) {
+            return tmbdDiscoverMovies();
         }
+        if (api.url.includes('omdbapi.com')) {
+            return fetchOMDb('anime movie');
+        }
+        if (api.url.includes('jikan.moe')) {
+            return fetchJikanMovies();
+        }
+        if (api.url.includes('anilist.co')) {
+            return fetchAniListMovies();
+        }
+        if (api.url.includes('kitsu.io')) {
+            return fetchKitsuMovies();
+        }
+        if (api.url.includes('animethemes.moe')) {
+            return fetchAnimeThemesMovies();
+        }
+        if (api.url.includes('trakt.tv')) {
+            return fetchTraktMovies();
+        }
+        return [];
     }
-    return Array.from(uniqueMap.values());
+    catch (error) {
+        console.error(`Error fetching from API ${api.name}:`, error);
+        return [];
+    }
+}
+async function fetchRSS(rss) {
+    if (!rss.url)
+        return [];
+    return crawlRSS(rss.url);
+}
+async function fetchSite(site) {
+    if (!site.url)
+        return [];
+    return crawlSite(site.url);
+}
+export async function crawlFilms() {
+    const sources = getFilmSources();
+    const results = await Promise.all([
+        ...sources.apis.map(api => fetchFromAPI(api)),
+        ...sources.rss.map(rss => fetchRSS(rss)),
+        ...sources.sites.map(site => fetchSite(site)),
+    ]);
+    return results.flat();
 }
 export async function crawlFilmsByGenre(genre) {
     if (!TMDB_KEY)

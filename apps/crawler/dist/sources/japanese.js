@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { getJapaneseSources } from './manager';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 async function fetchHtml(url) {
     const res = await fetch(url, {
@@ -9,14 +10,207 @@ async function fetchHtml(url) {
         throw new Error(`HTTP ${res.status}`);
     return res.text();
 }
-export async function fetchNHK() {
+async function fetchFromAPI(source) {
+    try {
+        if (source.name === 'NHK') {
+            return fetchNHK(source.url);
+        }
+        if (source.name === 'Media Arts DB') {
+            return fetchMediaArtsDB(source.url);
+        }
+        if (source.name === 'Annict') {
+            return fetchAnnict(source.url);
+        }
+        if (source.name === 'Shoboi Calendar') {
+            return fetchShoboiCalendar(source.url);
+        }
+        if (source.name === 'Shangrila') {
+            return fetchShangrila(source.url);
+        }
+        return [];
+    }
+    catch (error) {
+        console.error(`Error fetching ${source.name}:`, error);
+        return [];
+    }
+}
+async function fetchFromSite(source) {
+    try {
+        const html = await fetchHtml(source.url);
+        const $ = cheerio.load(html);
+        const items = [];
+        const selectors = {
+            'TV東京': [
+                { title: '.program-list-item h3, .anime-item h3, .title', content: '.desc, .synopsis', link: 'a' },
+            ],
+            'TBS': [
+                { title: '.anime-item h3, .program-item h3, .title, .name', content: '.text, .description', link: 'a' },
+            ],
+            '日本テレビ': [
+                { title: '.anime-list-item h3, .program-item h3, .title', content: '.description, .synopsis', link: 'a' },
+            ],
+            'フジテレビ': [
+                { title: '.anime-item h3, .program-item h3, .title', content: '.desc, .synopsis', link: 'a' },
+            ],
+            'テレ朝': [
+                { title: '.anime-item h3, .program-item h3, .title', content: '.desc, .synopsis', link: 'a' },
+            ],
+            'anime.dbsearch.net': [
+                { title: '.result-item .title, .anime-item .title', content: '.description', link: 'a' },
+            ],
+            '日本アニメ大全': [
+                { title: '.anime-item h3, .entry h3, .title', content: '.text, .description', link: 'a' },
+            ],
+            '声優データベース': [
+                { title: '.voice-actor-item h3, .article-item h3, .title', content: '.description', link: 'a' },
+            ],
+            'アニメ！アニメ！': [
+                { title: '.article-title, .post-title, h2 a', content: '', link: 'self' },
+            ],
+            'animebox': [
+                { title: '.post-title, .entry-title, h2 a', content: '', link: 'self' },
+            ],
+            'ねいろ速報': [
+                { title: '.post-title h3 a, h3 a', content: '', link: 'self' },
+            ],
+            'ASCII.jp アニメ': [
+                { title: 'h2 a, .entry-title a', content: '', link: 'self' },
+            ],
+            'アキバ総研': [
+                { title: '.article-title h2 a, h2 a, .post-title', content: '', link: 'self' },
+            ],
+        };
+        const selectorConfig = selectors[source.name];
+        if (selectorConfig) {
+            for (const config of selectorConfig) {
+                if (config.link === 'self') {
+                    $(config.title).each((_, el) => {
+                        const title = $(el).text().trim();
+                        const link = $(el).attr('href');
+                        if (title && link) {
+                            items.push({
+                                title,
+                                content: title,
+                                source: source.name,
+                                sourceType: 'site',
+                                url: link,
+                            });
+                        }
+                    });
+                }
+                else {
+                    $(config.title).each((_, el) => {
+                        const title = $(el).text().trim();
+                        const desc = $(el).find(config.content).text().trim();
+                        const link = $(el).find(config.link).attr('href');
+                        if (title) {
+                            items.push({
+                                title,
+                                content: desc || '',
+                                source: source.name,
+                                sourceType: 'site',
+                                url: link ? link.startsWith('http') ? link : `${new URL(source.url).origin}${link}` : undefined,
+                            });
+                        }
+                    });
+                }
+            }
+        }
+        return items.slice(0, 20);
+    }
+    catch (error) {
+        console.error(`Error fetching ${source.name}:`, error);
+        return [];
+    }
+}
+async function fetchFromRSS(source) {
+    try {
+        const res = await fetch(source.url, {
+            signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok)
+            throw new Error(`RSS error: ${res.status}`);
+        const xml = await res.text();
+        const $ = cheerio.load(xml, { xmlMode: true });
+        const items = [];
+        $('item').each((_, el) => {
+            const title = $(el).find('title').text().trim();
+            const link = $(el).find('link').text().trim();
+            const desc = $(el).find('description').text().trim();
+            const pubDate = $(el).find('pubDate').text().trim();
+            if (title) {
+                items.push({
+                    title,
+                    content: desc.substring(0, 200),
+                    source: source.name,
+                    sourceType: 'rss',
+                    url: link,
+                    publishedAt: pubDate,
+                });
+            }
+        });
+        return items.slice(0, 15);
+    }
+    catch (error) {
+        console.error(`Error fetching ${source.name}:`, error);
+        return [];
+    }
+}
+async function fetchFromSocial(source) {
+    try {
+        if (source.name.includes('5ch') || source.name.includes('ちゃんねる')) {
+            const html = await fetchHtml(source.url);
+            const $ = cheerio.load(html);
+            const items = [];
+            $('.thread-title, .title').each((_, el) => {
+                const title = $(el).text().trim();
+                const link = $(el).find('a').attr('href');
+                if (title && link) {
+                    items.push({
+                        title,
+                        content: title,
+                        source: source.name,
+                        sourceType: 'community',
+                        url: link,
+                    });
+                }
+            });
+            return items.slice(0, 10);
+        }
+        if (source.name.includes('はてな')) {
+            const html = await fetchHtml(source.url);
+            const $ = cheerio.load(html);
+            const items = [];
+            $('.entry-list-item, .bookmark-item').each((_, el) => {
+                const title = $(el).find('.entry-title').text().trim();
+                const url = $(el).find('a').attr('href');
+                if (title && url) {
+                    items.push({
+                        title,
+                        content: title,
+                        source: source.name,
+                        sourceType: 'community',
+                        url,
+                    });
+                }
+            });
+            return items.slice(0, 15);
+        }
+        return [];
+    }
+    catch (error) {
+        console.error(`Error fetching ${source.name}:`, error);
+        return [];
+    }
+}
+async function fetchNHK(apiUrl) {
     try {
         const apiKey = process.env.NHK_API_KEY;
         if (!apiKey) {
             console.log('NHK API key not configured');
             return [];
         }
-        const res = await fetch('https://api-portal.nhk.or.jp/v1/pg/list/genre/all/date/0?isMulti=true', {
+        const res = await fetch(apiUrl, {
             headers: { 'X-API-Key': apiKey },
             signal: AbortSignal.timeout(10000),
         });
@@ -37,22 +231,22 @@ export async function fetchNHK() {
         return [];
     }
 }
-export async function fetchMediaArtsDB() {
+async function fetchMediaArtsDB(url) {
     try {
-        const html = await fetchHtml('https://mediaarts-db.bunka.go.jp/mg/search?category=anime&sort=publish');
+        const html = await fetchHtml(url);
         const $ = cheerio.load(html);
         const items = [];
         $('.search-result-item').each((_, el) => {
             const title = $(el).find('.title').text().trim();
             const detail = $(el).find('.detail').text().trim();
-            const url = $(el).find('a').first().attr('href');
+            const link = $(el).find('a').first().attr('href');
             if (title) {
                 items.push({
                     title,
                     content: detail || title,
                     source: 'Media Arts DB',
                     sourceType: 'api',
-                    url: url ? `https://mediaarts-db.bunka.go.jp${url}` : undefined,
+                    url: link ? `https://mediaarts-db.bunka.go.jp${link}` : undefined,
                 });
             }
         });
@@ -63,14 +257,14 @@ export async function fetchMediaArtsDB() {
         return [];
     }
 }
-export async function fetchAnnict() {
+async function fetchAnnict(apiUrl) {
     try {
         const apiKey = process.env.ANNICT_API_KEY;
         if (!apiKey) {
             console.log('Annict API key not configured');
             return [];
         }
-        const res = await fetch('https://api.annict.com/v1/works?filter_season=2026-spring&fields=id,title,title_ja,number&per_page=50', {
+        const res = await fetch(apiUrl, {
             headers: { 'Authorization': `Bearer ${apiKey}` },
             signal: AbortSignal.timeout(10000),
         });
@@ -91,9 +285,9 @@ export async function fetchAnnict() {
         return [];
     }
 }
-export async function fetchShoboiCalendar() {
+async function fetchShoboiCalendar(apiUrl) {
     try {
-        const res = await fetch('https://cal.syoboi.jp/cal_ch2/?tid=0&days=7&alt=json', {
+        const res = await fetch(apiUrl, {
             signal: AbortSignal.timeout(10000),
         });
         if (!res.ok)
@@ -119,14 +313,14 @@ export async function fetchShoboiCalendar() {
         return [];
     }
 }
-export async function fetchShangrila() {
+async function fetchShangrila(apiUrl) {
     try {
         const apiKey = process.env.SHANGRILA_API_KEY;
         if (!apiKey) {
             console.log('Shangrila API key not configured');
             return [];
         }
-        const res = await fetch('https://api.annict.net/v1/works?filter_season=2026-spring&fields=id,title,title_ja&per_page=30', {
+        const res = await fetch(apiUrl, {
             headers: { 'Authorization': `Bearer ${apiKey}` },
             signal: AbortSignal.timeout(10000),
         });
@@ -146,510 +340,28 @@ export async function fetchShangrila() {
         return [];
     }
 }
-export async function fetchTVTokyo() {
-    try {
-        const html = await fetchHtml('https://www.tv-tokyo.co.jp/anime/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.program-list-item, .anime-item').each((_, el) => {
-            const title = $(el).find('h3, .title').text().trim();
-            const desc = $(el).find('.desc, .synopsis').text().trim();
-            const link = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: 'TV東京',
-                    sourceType: 'site',
-                    url: link ? `https://www.tv-tokyo.co.jp${link}` : undefined,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching TV Tokyo:', error);
-        return [];
-    }
-}
-export async function fetchTBSTV() {
-    try {
-        const html = await fetchHtml('https://tbs.co.jp/anime/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.anime-item, .program-item').each((_, el) => {
-            const title = $(el).find('h3, .title, .name').text().trim();
-            const desc = $(el).find('.text, .description').text().trim();
-            const link = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: 'TBS',
-                    sourceType: 'site',
-                    url: link ? `https://tbs.co.jp${link}` : undefined,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching TBS:', error);
-        return [];
-    }
-}
-export async function fetchNTV() {
-    try {
-        const html = await fetchHtml('https://www.ntv.co.jp/anime/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.anime-list-item, .program-item').each((_, el) => {
-            const title = $(el).find('h3, .title').text().trim();
-            const desc = $(el).find('.description, .synopsis').text().trim();
-            const link = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: '日本テレビ',
-                    sourceType: 'site',
-                    url: link ? `https://www.ntv.co.jp${link}` : undefined,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching NTV:', error);
-        return [];
-    }
-}
-export async function fetchFujiTV() {
-    try {
-        const html = await fetchHtml('https://www.fujitv.co.jp/anime/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.anime-item, .program-item').each((_, el) => {
-            const title = $(el).find('h3, .title').text().trim();
-            const desc = $(el).find('.desc, .synopsis').text().trim();
-            const link = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: 'フジテレビ',
-                    sourceType: 'site',
-                    url: link ? `https://www.fujitv.co.jp${link}` : undefined,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching Fuji TV:', error);
-        return [];
-    }
-}
-export async function fetchTVAsahi() {
-    try {
-        const html = await fetchHtml('https://www.tv-asahi.co.jp/anime/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.anime-item, .program-item').each((_, el) => {
-            const title = $(el).find('h3, .title').text().trim();
-            const desc = $(el).find('.desc, .synopsis').text().trim();
-            const link = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: 'テレ朝',
-                    sourceType: 'site',
-                    url: link ? `https://www.tv-asahi.co.jp${link}` : undefined,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching TV Asahi:', error);
-        return [];
-    }
-}
-export async function fetchAnimeDB() {
-    try {
-        const html = await fetchHtml('https://anime.dbsearch.net/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.result-item, .anime-item').each((_, el) => {
-            const title = $(el).find('.title').text().trim();
-            const desc = $(el).find('.description').text().trim();
-            const url = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: 'anime.dbsearch.net',
-                    sourceType: 'site',
-                    url: url || undefined,
-                });
-            }
-        });
-        return items.slice(0, 20);
-    }
-    catch (error) {
-        console.error('Error fetching AnimeDB:', error);
-        return [];
-    }
-}
-export async function fetchAniMedb() {
-    try {
-        const html = await fetchHtml('https://www.animedb.jp/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.anime-item, .entry').each((_, el) => {
-            const title = $(el).find('h3, .title').text().trim();
-            const desc = $(el).find('.text, .description').text().trim();
-            const url = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: '日本アニメ大全',
-                    sourceType: 'site',
-                    url: url || undefined,
-                });
-            }
-        });
-        return items.slice(0, 20);
-    }
-    catch (error) {
-        console.error('Error fetching AniMedb:', error);
-        return [];
-    }
-}
-export async function fetchSeigura() {
-    try {
-        const html = await fetchHtml('https://www.seigura.com/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.voice-actor-item, .article-item').each((_, el) => {
-            const title = $(el).find('h3, .title').text().trim();
-            const desc = $(el).find('.description').text().trim();
-            const url = $(el).find('a').attr('href');
-            if (title) {
-                items.push({
-                    title,
-                    content: desc || '',
-                    source: '声優データベース',
-                    sourceType: 'site',
-                    url: url ? `https://www.seigura.com${url}` : undefined,
-                });
-            }
-        });
-        return items.slice(0, 20);
-    }
-    catch (error) {
-        console.error('Error fetching Seigura:', error);
-        return [];
-    }
-}
-export async function fetchAnimeAnimeJp() {
-    try {
-        const html = await fetchHtml('https://animeanime.jp/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.article-title, .post-title, h2 a').each((_, el) => {
-            const title = $(el).text().trim();
-            const link = $(el).attr('href');
-            if (title && link) {
-                items.push({
-                    title,
-                    content: title,
-                    source: 'アニメ！アニメ！',
-                    sourceType: 'site',
-                    url: link,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching animeanime.jp:', error);
-        return [];
-    }
-}
-export async function fetchAnimeBox() {
-    try {
-        const html = await fetchHtml('https://animebox.net/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.post-title, .entry-title, h2 a').each((_, el) => {
-            const title = $(el).text().trim();
-            const link = $(el).attr('href');
-            if (title && link) {
-                items.push({
-                    title,
-                    content: title,
-                    source: 'animebox',
-                    sourceType: 'site',
-                    url: link,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching animebox:', error);
-        return [];
-    }
-}
-export async function fetchNeiro() {
-    try {
-        const html = await fetchHtml('https://neironote.com/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.post-title, h3 a').each((_, el) => {
-            const title = $(el).text().trim();
-            const link = $(el).attr('href');
-            if (title && link) {
-                items.push({
-                    title,
-                    content: title,
-                    source: 'ねいろ速報',
-                    sourceType: 'site',
-                    url: link,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching neiro:', error);
-        return [];
-    }
-}
-export async function fetchASCIIAnime() {
-    try {
-        const html = await fetchHtml('https://ascii.jp/elem/000/000/000/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('h2 a, .entry-title a').each((_, el) => {
-            const title = $(el).text().trim();
-            const link = $(el).attr('href');
-            if (title && link) {
-                items.push({
-                    title,
-                    content: title,
-                    source: 'ASCII.jp アニメ',
-                    sourceType: 'site',
-                    url: link,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching ASCII anime:', error);
-        return [];
-    }
-}
-export async function fetchAkibaSouken() {
-    try {
-        const html = await fetchHtml('https://akiba-souken.com/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.article-title, h2 a, .post-title').each((_, el) => {
-            const title = $(el).text().trim();
-            const link = $(el).attr('href');
-            if (title && link) {
-                items.push({
-                    title,
-                    content: title,
-                    source: 'アキバ総研',
-                    sourceType: 'site',
-                    url: link,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching Akiba Souken:', error);
-        return [];
-    }
-}
-export async function fetchGo5chAnime() {
-    try {
-        const html = await fetchHtml('https://egg.5ch.net/10/)');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.thread-title, .title').each((_, el) => {
-            const title = $(el).text().trim();
-            const link = $(el).find('a').attr('href');
-            if (title && link) {
-                items.push({
-                    title,
-                    content: title,
-                    source: '5ちゃんねる (アニメ板)',
-                    sourceType: 'community',
-                    url: link,
-                });
-            }
-        });
-        return items.slice(0, 10);
-    }
-    catch (error) {
-        console.error('Error fetching 5ch anime:', error);
-        return [];
-    }
-}
-export async function fetchHatenaAnime() {
-    try {
-        const html = await fetchHtml('https://b.hatena.ne.jp/keywordlist?word=アニメ');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.entry-list-item, .bookmark-item').each((_, el) => {
-            const title = $(el).find('.entry-title').text().trim();
-            const url = $(el).find('a').attr('href');
-            if (title && url) {
-                items.push({
-                    title,
-                    content: title,
-                    source: 'はてなブックマーク',
-                    sourceType: 'community',
-                    url,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching Hatena:', error);
-        return [];
-    }
-}
-export async function fetchAnimeAnimeRSS() {
-    try {
-        const res = await fetch('https://animeanime.jp/feed', {
-            signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok)
-            throw new Error(`RSS error: ${res.status}`);
-        const xml = await res.text();
-        const $ = cheerio.load(xml, { xmlMode: true });
-        const items = [];
-        $('item').each((_, el) => {
-            const title = $(el).find('title').text().trim();
-            const link = $(el).find('link').text().trim();
-            const desc = $(el).find('description').text().trim();
-            const pubDate = $(el).find('pubDate').text().trim();
-            if (title) {
-                items.push({
-                    title,
-                    content: desc.substring(0, 200),
-                    source: 'アニメ！アニメ！ RSS',
-                    sourceType: 'rss',
-                    url: link,
-                    publishedAt: pubDate,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching animeanime RSS:', error);
-        return [];
-    }
-}
-export async function fetchAnimeBoxRSS() {
-    try {
-        const res = await fetch('https://animebox.net/feed', {
-            signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok)
-            throw new Error(`RSS error: ${res.status}`);
-        const xml = await res.text();
-        const $ = cheerio.load(xml, { xmlMode: true });
-        const items = [];
-        $('item').each((_, el) => {
-            const title = $(el).find('title').text().trim();
-            const link = $(el).find('link').text().trim();
-            const desc = $(el).find('description').text().trim();
-            const pubDate = $(el).find('pubDate').text().trim();
-            if (title) {
-                items.push({
-                    title,
-                    content: desc.substring(0, 200),
-                    source: 'AnimeBox RSS',
-                    sourceType: 'rss',
-                    url: link,
-                    publishedAt: pubDate,
-                });
-            }
-        });
-        return items.slice(0, 15);
-    }
-    catch (error) {
-        console.error('Error fetching animebox RSS:', error);
-        return [];
-    }
-}
 export async function crawlJapanese() {
     console.log('🇯🇵 Starting Japanese sources crawl...');
-    const [nhk, mediaartsdb, annict, shoboi, shangrila, tvTokyo, tbs, ntv, fuji, tvAsahi, animeDB, animedb, seigura, animeAnime, animeBox, neiro, ascii, akiba, go5ch, hatena, animeRSS, boxRSS] = await Promise.all([
-        fetchNHK(),
-        fetchMediaArtsDB(),
-        fetchAnnict(),
-        fetchShoboiCalendar(),
-        fetchShangrila(),
-        fetchTVTokyo(),
-        fetchTBSTV(),
-        fetchNTV(),
-        fetchFujiTV(),
-        fetchTVAsahi(),
-        fetchAnimeDB(),
-        fetchAniMedb(),
-        fetchSeigura(),
-        fetchAnimeAnimeJp(),
-        fetchAnimeBox(),
-        fetchNeiro(),
-        fetchASCIIAnime(),
-        fetchAkibaSouken(),
-        fetchGo5chAnime(),
-        fetchHatenaAnime(),
-        fetchAnimeAnimeRSS(),
-        fetchAnimeBoxRSS(),
+    const sources = getJapaneseSources();
+    const apiPromises = sources.apis.map((source) => fetchFromAPI(source));
+    const sitePromises = sources.sites.map((source) => fetchFromSite(source));
+    const rssPromises = sources.rss.map((source) => fetchFromRSS(source));
+    const socialPromises = sources.social.map((source) => fetchFromSocial(source));
+    const [apis, sites, rss, social] = await Promise.all([
+        Promise.all(apiPromises),
+        Promise.all(sitePromises),
+        Promise.all(rssPromises),
+        Promise.all(socialPromises),
     ]);
     const results = [
-        ...nhk,
-        ...mediaartsdb,
-        ...annict,
-        ...shoboi,
-        ...shangrila,
-        ...tvTokyo,
-        ...tbs,
-        ...ntv,
-        ...fuji,
-        ...tvAsahi,
-        ...animeDB,
-        ...animedb,
-        ...seigura,
-        ...animeAnime,
-        ...animeBox,
-        ...neiro,
-        ...ascii,
-        ...akiba,
-        ...go5ch,
-        ...hatena,
-        ...animeRSS,
-        ...boxRSS,
+        ...apis.flat(),
+        ...sites.flat(),
+        ...rss.flat(),
+        ...social.flat(),
     ];
-    console.log(`   - APIs: ${nhk.length + mediaartsdb.length + annict.length + shoboi.length + shangrila.length}`);
-    console.log(`   - Broadcasters: ${tvTokyo.length + tbs.length + ntv.length + fuji.length + tvAsahi.length}`);
-    console.log(`   - Databases: ${animeDB.length + animedb.length + seigura.length}`);
-    console.log(`   - News: ${animeAnime.length + animeBox.length + neiro.length + ascii.length + akiba.length}`);
-    console.log(`   - Community: ${go5ch.length + hatena.length}`);
-    console.log(`   - RSS: ${animeRSS.length + boxRSS.length}`);
+    console.log(`   - APIs: ${apis.flat().length}`);
+    console.log(`   - Sites: ${sites.flat().length}`);
+    console.log(`   - RSS: ${rss.flat().length}`);
+    console.log(`   - Social: ${social.flat().length}`);
     return results;
 }

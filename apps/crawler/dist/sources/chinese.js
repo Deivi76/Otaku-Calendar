@@ -1,8 +1,4 @@
-const BILIBILI_API = process.env.BILIBILI_API || 'https://api.bilibili.com';
-const DOUBAN_API = process.env.DOUBAN_API || 'https://api.douban.com/v2';
-const IQIYI_API = process.env.IQIYI_API || 'https://www.iq.com';
-const TENCENT_API = process.env.TENCENT_API || 'https://v.qq.com';
-const WEIBO_API = process.env.WEIBO_API || 'https://m.weibo.cn';
+import { getChineseSources } from './manager';
 const RATE_LIMIT_DELAY = 300;
 let lastRequestTime = 0;
 async function rateLimitedFetch(url, options) {
@@ -27,7 +23,10 @@ async function rateLimitedFetch(url, options) {
 }
 export async function fetchBilibiliPopular() {
     try {
-        const res = await rateLimitedFetch(`${BILIBILI_API}/x/web-interface/ranking/v3?rid=1&type=1&pn=1&ps=25`);
+        const sources = getChineseSources();
+        const bilibiliApi = sources.apis.find(s => s.name === 'Bilibili');
+        const apiUrl = bilibiliApi?.url || 'https://api.bilibili.com';
+        const res = await rateLimitedFetch(`${apiUrl}/x/web-interface/ranking/v3?rid=1&type=1&pn=1&ps=25`);
         return res.data?.list?.slice(0, 20).map((anime) => ({
             title: anime.title,
             content: anime.desc?.substring(0, 200) || `播放: ${anime.play}, 弹幕: ${anime.danmaku}`,
@@ -44,7 +43,10 @@ export async function fetchBilibiliPopular() {
 }
 export async function fetchBilibiliBangumi() {
     try {
-        const res = await rateLimitedFetch(`${BILIBILI_API}/x/web-interface/ranking/v3?rid=201&type=1&pn=1&ps=25`);
+        const sources = getChineseSources();
+        const bilibiliApi = sources.apis.find(s => s.name === 'Bilibili Bangumi');
+        const apiUrl = bilibiliApi?.url || 'https://api.bilibili.com';
+        const res = await rateLimitedFetch(`${apiUrl}/x/web-interface/ranking/v3?rid=201&type=1&pn=1&ps=25`);
         return res.data?.list?.slice(0, 15).map((anime) => ({
             title: anime.title,
             content: anime.desc?.substring(0, 200) || `播放: ${anime.play}, 弹幕: ${anime.danmaku}`,
@@ -61,7 +63,10 @@ export async function fetchBilibiliBangumi() {
 }
 export async function fetchDoubanTV() {
     try {
-        const res = await rateLimitedFetch(`${DOUBAN_API}/tv/top250?start=0&count=25`);
+        const sources = getChineseSources();
+        const doubanApi = sources.apis.find(s => s.name === 'Douban');
+        const apiUrl = doubanApi?.url || 'https://api.douban.com/v2';
+        const res = await rateLimitedFetch(`${apiUrl}/tv/top250?start=0&count=25`);
         return res.subjects?.slice(0, 15).map((drama) => ({
             title: drama.title,
             content: `豆瓣评分: ${drama.rating} | ${drama.genres?.join(', ')}`,
@@ -78,7 +83,10 @@ export async function fetchDoubanTV() {
 }
 export async function fetchDoubanChineseMovies() {
     try {
-        const res = await rateLimitedFetch(`${DOUBAN_API}/search?tag=华语&start=0&count=25`);
+        const sources = getChineseSources();
+        const doubanApi = sources.apis.find(s => s.name === 'Douban Chinese Movies');
+        const apiUrl = doubanApi?.url || 'https://api.douban.com/v2';
+        const res = await rateLimitedFetch(`${apiUrl}/search?tag=华语&start=0&count=25`);
         return res.subjects?.slice(0, 15).map((movie) => ({
             title: movie.title,
             content: `豆瓣评分: ${movie.rating} | ${movie.genres?.join(', ')}`,
@@ -95,7 +103,10 @@ export async function fetchDoubanChineseMovies() {
 }
 export async function fetchWeiboTrending() {
     try {
-        const res = await rateLimitedFetch(`${WEIBO_API}/container/getIndexHotFeedTpl?containerid=102803&openApp=0`);
+        const sources = getChineseSources();
+        const weiboApi = sources.apis.find(s => s.name === 'Weibo');
+        const apiUrl = weiboApi?.url || 'https://m.weibo.cn';
+        const res = await rateLimitedFetch(`${apiUrl}/container/getIndexHotFeedTpl?containerid=102803&openApp=0`);
         return res.data?.data?.slice(0, 15).map((item) => ({
             title: item.title || item.word || item.raw_title || 'Trending',
             content: `${item.desc || item.extr} | 热度: ${item.num}`,
@@ -112,7 +123,10 @@ export async function fetchWeiboTrending() {
 }
 export async function fetchBilibiliAnimeNews() {
     try {
-        const res = await rateLimitedFetch(`${BILIBILI_API}/x/web-interface/ranking/v3?rid=201&type=2&pn=1&ps=20`);
+        const sources = getChineseSources();
+        const bilibiliApi = sources.apis.find(s => s.name === 'Bilibili Anime News');
+        const apiUrl = bilibiliApi?.url || 'https://api.bilibili.com';
+        const res = await rateLimitedFetch(`${apiUrl}/x/web-interface/ranking/v3?rid=201&type=2&pn=1&ps=20`);
         return res.data?.list?.slice(0, 10).map((news) => ({
             title: news.title,
             content: news.desc?.substring(0, 200) || `播放: ${news.play}`,
@@ -129,7 +143,10 @@ export async function fetchBilibiliAnimeNews() {
 }
 export async function fetchiQIYI热门() {
     try {
-        const res = await rateLimitedFetch(`${IQIYI_API}/片库?pn=0&ps=20&sort=18`);
+        const sources = getChineseSources();
+        const iqiyiApi = sources.apis.find(s => s.name === 'iQIYI');
+        const apiUrl = iqiyiApi?.url || 'https://www.iq.com';
+        const res = await rateLimitedFetch(`${apiUrl}/片库?pn=0&ps=20&sort=18`);
         return [];
     }
     catch (error) {
@@ -139,7 +156,10 @@ export async function fetchiQIYI热门() {
 }
 export async function fetchTencentDonghua() {
     try {
-        const res = await rateLimitedFetch(`${TENCENT_API}/channel/groot/videolist?pageId=345843&pageSize=20&sort=5`);
+        const sources = getChineseSources();
+        const tencentApi = sources.apis.find(s => s.name === 'Tencent');
+        const apiUrl = tencentApi?.url || 'https://v.qq.com';
+        const res = await rateLimitedFetch(`${apiUrl}/channel/groot/videolist?pageId=345843&pageSize=20&sort=5`);
         return [];
     }
     catch (error) {
@@ -148,6 +168,7 @@ export async function fetchTencentDonghua() {
     }
 }
 export async function crawlChinese() {
+    const sources = getChineseSources();
     const [bilibiliPopular, bilibiliBangumi, doubanTV, doubanMovies, weibo, bilibiliNews] = await Promise.all([
         fetchBilibiliPopular(),
         fetchBilibiliBangumi(),

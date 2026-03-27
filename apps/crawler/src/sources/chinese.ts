@@ -1,3 +1,5 @@
+import { getChineseSources } from './manager';
+
 export interface CrawledItem {
   title: string;
   content: string;
@@ -6,12 +8,6 @@ export interface CrawledItem {
   url?: string;
   publishedAt?: string;
 }
-
-const BILIBILI_API = process.env.BILIBILI_API || 'https://api.bilibili.com';
-const DOUBAN_API = process.env.DOUBAN_API || 'https://api.douban.com/v2';
-const IQIYI_API = process.env.IQIYI_API || 'https://www.iq.com';
-const TENCENT_API = process.env.TENCENT_API || 'https://v.qq.com';
-const WEIBO_API = process.env.WEIBO_API || 'https://m.weibo.cn';
 
 const RATE_LIMIT_DELAY = 300;
 
@@ -43,8 +39,12 @@ async function rateLimitedFetch(url: string, options?: RequestInit): Promise<any
 
 export async function fetchBilibiliPopular(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const bilibiliApi = sources.apis.find(s => s.name === 'Bilibili');
+    const apiUrl = bilibiliApi?.url || 'https://api.bilibili.com';
+
     const res = await rateLimitedFetch(
-      `${BILIBILI_API}/x/web-interface/ranking/v3?rid=1&type=1&pn=1&ps=25`
+      `${apiUrl}/x/web-interface/ranking/v3?rid=1&type=1&pn=1&ps=25`
     );
 
     return res.data?.list?.slice(0, 20).map((anime: any) => ({
@@ -63,8 +63,12 @@ export async function fetchBilibiliPopular(): Promise<CrawledItem[]> {
 
 export async function fetchBilibiliBangumi(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const bilibiliApi = sources.apis.find(s => s.name === 'Bilibili Bangumi');
+    const apiUrl = bilibiliApi?.url || 'https://api.bilibili.com';
+
     const res = await rateLimitedFetch(
-      `${BILIBILI_API}/x/web-interface/ranking/v3?rid=201&type=1&pn=1&ps=25`
+      `${apiUrl}/x/web-interface/ranking/v3?rid=201&type=1&pn=1&ps=25`
     );
 
     return res.data?.list?.slice(0, 15).map((anime: any) => ({
@@ -83,8 +87,12 @@ export async function fetchBilibiliBangumi(): Promise<CrawledItem[]> {
 
 export async function fetchDoubanTV(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const doubanApi = sources.apis.find(s => s.name === 'Douban');
+    const apiUrl = doubanApi?.url || 'https://api.douban.com/v2';
+
     const res = await rateLimitedFetch(
-      `${DOUBAN_API}/tv/top250?start=0&count=25`
+      `${apiUrl}/tv/top250?start=0&count=25`
     );
 
     return res.subjects?.slice(0, 15).map((drama: any) => ({
@@ -103,8 +111,12 @@ export async function fetchDoubanTV(): Promise<CrawledItem[]> {
 
 export async function fetchDoubanChineseMovies(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const doubanApi = sources.apis.find(s => s.name === 'Douban Chinese Movies');
+    const apiUrl = doubanApi?.url || 'https://api.douban.com/v2';
+
     const res = await rateLimitedFetch(
-      `${DOUBAN_API}/search?tag=华语&start=0&count=25`
+      `${apiUrl}/search?tag=华语&start=0&count=25`
     );
 
     return res.subjects?.slice(0, 15).map((movie: any) => ({
@@ -123,8 +135,12 @@ export async function fetchDoubanChineseMovies(): Promise<CrawledItem[]> {
 
 export async function fetchWeiboTrending(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const weiboApi = sources.apis.find(s => s.name === 'Weibo');
+    const apiUrl = weiboApi?.url || 'https://m.weibo.cn';
+
     const res = await rateLimitedFetch(
-      `${WEIBO_API}/container/getIndexHotFeedTpl?containerid=102803&openApp=0`
+      `${apiUrl}/container/getIndexHotFeedTpl?containerid=102803&openApp=0`
     );
 
     return res.data?.data?.slice(0, 15).map((item: any) => ({
@@ -143,8 +159,12 @@ export async function fetchWeiboTrending(): Promise<CrawledItem[]> {
 
 export async function fetchBilibiliAnimeNews(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const bilibiliApi = sources.apis.find(s => s.name === 'Bilibili Anime News');
+    const apiUrl = bilibiliApi?.url || 'https://api.bilibili.com';
+
     const res = await rateLimitedFetch(
-      `${BILIBILI_API}/x/web-interface/ranking/v3?rid=201&type=2&pn=1&ps=20`
+      `${apiUrl}/x/web-interface/ranking/v3?rid=201&type=2&pn=1&ps=20`
     );
 
     return res.data?.list?.slice(0, 10).map((news: any) => ({
@@ -163,8 +183,12 @@ export async function fetchBilibiliAnimeNews(): Promise<CrawledItem[]> {
 
 export async function fetchiQIYI热门(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const iqiyiApi = sources.apis.find(s => s.name === 'iQIYI');
+    const apiUrl = iqiyiApi?.url || 'https://www.iq.com';
+
     const res = await rateLimitedFetch(
-      `${IQIYI_API}/片库?pn=0&ps=20&sort=18`
+      `${apiUrl}/片库?pn=0&ps=20&sort=18`
     );
 
     return [];
@@ -176,8 +200,12 @@ export async function fetchiQIYI热门(): Promise<CrawledItem[]> {
 
 export async function fetchTencentDonghua(): Promise<CrawledItem[]> {
   try {
+    const sources = getChineseSources();
+    const tencentApi = sources.apis.find(s => s.name === 'Tencent');
+    const apiUrl = tencentApi?.url || 'https://v.qq.com';
+
     const res = await rateLimitedFetch(
-      `${TENCENT_API}/channel/groot/videolist?pageId=345843&pageSize=20&sort=5`
+      `${apiUrl}/channel/groot/videolist?pageId=345843&pageSize=20&sort=5`
     );
 
     return [];
@@ -188,6 +216,8 @@ export async function fetchTencentDonghua(): Promise<CrawledItem[]> {
 }
 
 export async function crawlChinese(): Promise<CrawledItem[]> {
+  const sources = getChineseSources();
+
   const [bilibiliPopular, bilibiliBangumi, doubanTV, doubanMovies, weibo, bilibiliNews] = 
     await Promise.all([
       fetchBilibiliPopular(),

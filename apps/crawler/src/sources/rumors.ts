@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { getRumorsSources } from './manager';
 
 export interface CrawledItem {
   title: string;
@@ -13,42 +14,11 @@ export interface CrawledItem {
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-const RUMOR_SOURCES = {
-  sites: {
-    worstGen: 'https://worstgen.com',
-    onePieceSpoiler: 'https://onepiece.fandom.com/wiki/One_Piece_Spoilers',
-    mangaPredictions: 'https://mangapredictions.com',
-    arlongPark: 'https://arlongpark.net',
-    cubariMoe: 'https://cubari.moe',
-  },
-  fourChan: {
-    animeBoard: 'a',
-    visualNovels: 'vr',
-  },
-  twitter: [
-    'SugoiLITE',
-    'MangaMoguraRE',
-    'WorstGen',
-    'Mugiwara_23',
-    'mangaraw_jp',
-  ],
-  youtube: [
-    'Hassan Javed',
-    'Anime Hearsay',
-    'Otaku Kart',
-  ],
-  forums: {
-    reddit: [
-      'r/MangaCollectors',
-      'r/Kagurabachi',
-    ],
-    myAnimeList: 'https://myanimelist.net/forum',
-  },
-};
-
-async function fetchWorstGen(): Promise<CrawledItem[]> {
+async function fetchWorstGen(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
   try {
-    const html = await fetch(RUMOR_SOURCES.sites.worstGen, {
+    const source = sources.find(s => s.name.toLowerCase().includes('worstgen'));
+    const url = source?.url || 'https://worstgen.com';
+    const html = await fetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': USER_AGENT },
     }).then(r => r.text());
@@ -83,9 +53,11 @@ async function fetchWorstGen(): Promise<CrawledItem[]> {
   }
 }
 
-async function fetchOnePieceSpoiler(): Promise<CrawledItem[]> {
+async function fetchOnePieceSpoiler(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
   try {
-    const html = await fetch(RUMOR_SOURCES.sites.onePieceSpoiler, {
+    const source = sources.find(s => s.name.toLowerCase().includes('one piece') || s.name.toLowerCase().includes('spoiler'));
+    const url = source?.url || 'https://onepiece.fandom.com/wiki/One_Piece_Spoilers';
+    const html = await fetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': USER_AGENT },
     }).then(r => r.text());
@@ -116,9 +88,11 @@ async function fetchOnePieceSpoiler(): Promise<CrawledItem[]> {
   }
 }
 
-async function fetchArlongPark(): Promise<CrawledItem[]> {
+async function fetchArlongPark(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
   try {
-    const html = await fetch(RUMOR_SOURCES.sites.arlongPark, {
+    const source = sources.find(s => s.name.toLowerCase().includes('arlong'));
+    const url = source?.url || 'https://arlongpark.net';
+    const html = await fetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': USER_AGENT },
     }).then(r => r.text());
@@ -240,9 +214,11 @@ async function fetchRedditForum(subreddit: string): Promise<CrawledItem[]> {
   }
 }
 
-async function fetchMALForums(): Promise<CrawledItem[]> {
+async function fetchMALForums(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
   try {
-    const html = await fetch(RUMOR_SOURCES.forums.myAnimeList, {
+    const source = sources.find(s => s.name.toLowerCase().includes('myanimelist') || s.name.toLowerCase().includes('mal'));
+    const url = source?.url || 'https://myanimelist.net/forum';
+    const html = await fetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': USER_AGENT },
     }).then(r => r.text());
@@ -275,9 +251,13 @@ async function fetchMALForums(): Promise<CrawledItem[]> {
   }
 }
 
-async function fetchLeakerTwitter(): Promise<CrawledItem[]> {
+async function fetchLeakerTwitter(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
   const items: CrawledItem[] = [];
-  const twitterHandles = RUMOR_SOURCES.twitter;
+  const twitterHandles = sources.filter(s => s.url).map(s => s.name.replace('@', ''));
+
+  if (twitterHandles.length === 0) {
+    return [];
+  }
 
   for (const handle of twitterHandles) {
     try {
@@ -317,8 +297,8 @@ async function fetchLeakerTwitter(): Promise<CrawledItem[]> {
   return items.slice(0, 20);
 }
 
-async function fetchLeakYouTubers(): Promise<CrawledItem[]> {
-  const channels = RUMOR_SOURCES.youtube;
+async function fetchLeakYouTubers(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
+  const channels = sources.map(s => s.name);
   const items: CrawledItem[] = [];
 
   for (const channel of channels) {
@@ -417,9 +397,11 @@ async function fetchTelegramChannels(): Promise<CrawledItem[]> {
   return items.slice(0, 10);
 }
 
-async function fetchCubariMoe(): Promise<CrawledItem[]> {
+async function fetchCubariMoe(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
   try {
-    const html = await fetch(RUMOR_SOURCES.sites.cubariMoe, {
+    const source = sources.find(s => s.name.toLowerCase().includes('cubari'));
+    const url = source?.url || 'https://cubari.moe';
+    const html = await fetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': USER_AGENT },
     }).then(r => r.text());
@@ -452,9 +434,11 @@ async function fetchCubariMoe(): Promise<CrawledItem[]> {
   }
 }
 
-async function fetchMangaPredictions(): Promise<CrawledItem[]> {
+async function fetchMangaPredictions(sources: { name: string; url: string }[]): Promise<CrawledItem[]> {
   try {
-    const html = await fetch(RUMOR_SOURCES.sites.mangaPredictions, {
+    const source = sources.find(s => s.name.toLowerCase().includes('prediction'));
+    const url = source?.url || 'https://mangapredictions.com';
+    const html = await fetch(url, {
       signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': USER_AGENT },
     }).then(r => r.text());
@@ -498,6 +482,10 @@ export function markAsRumor(items: CrawledItem[]): CrawledItem[] {
 export async function crawlRumors(): Promise<CrawledItem[]> {
   console.log('🔍 Crawling rumor sources (Tier 4-5)...');
 
+  const sources = getRumorsSources();
+  const siteUrls = sources.sites.map(s => ({ name: s.name, url: s.url }));
+  const socialUrls = sources.social.map(s => ({ name: s.name, url: s.url }));
+
   const [
     worstGenItems,
     onePieceItems,
@@ -513,19 +501,19 @@ export async function crawlRumors(): Promise<CrawledItem[]> {
     cubariItems,
     predictionsItems,
   ] = await Promise.all([
-    fetchWorstGen(),
-    fetchOnePieceSpoiler(),
-    fetchArlongPark(),
+    fetchWorstGen(siteUrls),
+    fetchOnePieceSpoiler(siteUrls),
+    fetchArlongPark(siteUrls),
     fetch4chanAnime(),
     fetch4chanVN(),
     fetchRedditForum('r/MangaCollectors'),
     fetchRedditForum('r/Kagurabachi'),
-    fetchMALForums(),
-    fetchLeakerTwitter(),
-    fetchLeakYouTubers(),
+    fetchMALForums(siteUrls),
+    fetchLeakerTwitter(socialUrls),
+    fetchLeakYouTubers(socialUrls),
     fetchTelegramChannels(),
-    fetchCubariMoe(),
-    fetchMangaPredictions(),
+    fetchCubariMoe(siteUrls),
+    fetchMangaPredictions(siteUrls),
   ]);
 
   const allResults = [

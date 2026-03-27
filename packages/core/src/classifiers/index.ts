@@ -1,4 +1,5 @@
 import type { NormalizedAnimeItem } from '../normalizer';
+import { SOURCES_DATABASE } from '../sources-database';
 
 export type ClassificationType = 'confirmed' | 'rumor' | 'announcement' | 'live_action';
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
@@ -151,6 +152,53 @@ export function getTierScore(tier: ReliabilityTier): number {
   return RELIABILITY_TIERS[tier].score;
 }
 
+function getSourceReliability(sourceName: string): number {
+  const normalizedSource = sourceName.toLowerCase().trim();
+  
+  const allSources = [
+    ...SOURCES_DATABASE.apis.anime,
+    ...SOURCES_DATABASE.apis.manga,
+    ...SOURCES_DATABASE.apis.manhwa,
+    ...SOURCES_DATABASE.apis.streaming,
+    ...SOURCES_DATABASE.apis.film,
+    ...SOURCES_DATABASE.apis.studios,
+    ...SOURCES_DATABASE.apis.publishers,
+    ...SOURCES_DATABASE.apis.industry,
+    ...SOURCES_DATABASE.apis.series,
+    ...SOURCES_DATABASE.rss.news,
+    ...SOURCES_DATABASE.rss.manga,
+    ...SOURCES_DATABASE.rss.community,
+    ...SOURCES_DATABASE.rss.scanlation,
+    ...SOURCES_DATABASE.sites.news,
+    ...SOURCES_DATABASE.sites.databases,
+    ...SOURCES_DATABASE.sites.manhwa,
+    ...SOURCES_DATABASE.sites.streaming,
+    ...SOURCES_DATABASE.sites.liveAction,
+    ...SOURCES_DATABASE.sites.film,
+    ...SOURCES_DATABASE.sites.manga,
+    ...SOURCES_DATABASE.sites.community,
+    ...SOURCES_DATABASE.social.twitter,
+    ...SOURCES_DATABASE.social.reddit,
+    ...SOURCES_DATABASE.social.discord,
+    ...SOURCES_DATABASE.social.youtube,
+    ...SOURCES_DATABASE.social.tiktok,
+    ...SOURCES_DATABASE.social.facebook,
+    ...SOURCES_DATABASE.social.twitch,
+    ...SOURCES_DATABASE.social.telegram,
+    ...SOURCES_DATABASE.rumors.leaks,
+    ...SOURCES_DATABASE.rumors.forums,
+    ...SOURCES_DATABASE.rumors.insiders,
+    ...SOURCES_DATABASE.rumors.leads,
+  ];
+
+  const source = allSources.find(s => 
+    s.name.toLowerCase().includes(normalizedSource) || 
+    normalizedSource.includes(s.name.toLowerCase())
+  );
+  
+  return source?.reliability || 0.5;
+}
+
 export function classifyItem(item: NormalizedAnimeItem): ClassificationResult {
   const reasons: string[] = [];
   let type: ClassificationType = item.type;
@@ -163,6 +211,10 @@ export function classifyItem(item: NormalizedAnimeItem): ClassificationResult {
 
   confidence = Math.max(confidence, tierScore);
   reasons.push(`source tier: ${tier} (${RELIABILITY_TIERS[tier].description})`);
+
+  const sourceReliability = getSourceReliability(item.source || item.sourceType);
+  confidence = Math.min(confidence * sourceReliability, 1.0);
+  reasons.push(`source reliability: ${sourceReliability} (from SOURCES_DATABASE)`);
 
   const mediaType = detectMediaType(item);
   reasons.push(`media type: ${mediaType}`);

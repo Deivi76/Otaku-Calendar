@@ -1,16 +1,15 @@
 import * as cheerio from 'cheerio';
 import Parser from 'rss-parser';
-const COMICK_API = process.env.COMICK_API || 'https://api.comick.fun';
-const MANGADEX_API = process.env.MANGADEX_API || 'https://api.mangadex.org';
+import { getMangaSources } from './manager';
 const parser = new Parser({ timeout: 30000 });
-let lastMangaDexRequest = 0;
-async function rateLimitedFetch(url) {
-    const now = Date.now();
-    const elapsed = now - lastMangaDexRequest;
-    if (elapsed < 200) {
-        await new Promise(resolve => setTimeout(resolve, 200 - elapsed));
+const rateLimitedCache = new Map();
+async function rateLimitedFetch(url, minInterval = 200) {
+    const lastRequest = rateLimitedCache.get(url) || 0;
+    const elapsed = Date.now() - lastRequest;
+    if (elapsed < minInterval) {
+        await new Promise(resolve => setTimeout(resolve, minInterval - elapsed));
     }
-    lastMangaDexRequest = Date.now();
+    rateLimitedCache.set(url, Date.now());
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!res.ok)
         throw new Error(`API error: ${res.status}`);
@@ -25,362 +24,330 @@ async function fetchWithUA(url) {
     });
     return res.text();
 }
-export async function fetchMangaDex() {
+async function fetchFromAPI(source) {
     try {
-        const latest = await rateLimitedFetch(`${MANGADEX_API}/manga?order[latestUploadedChapter]=desc&limit=25&includes[]=cover_art`);
-        const popular = await rateLimitedFetch(`${MANGADEX_API}/manga?order[followedCount]=desc&limit=25&includes[]=cover_art`);
-        const mapManga = (manga) => ({
-            title: manga.attributes.title.en || manga.attributes.title['ja-ro'] || Object.values(manga.attributes.title)[0] || 'Unknown',
-            content: manga.attributes.description?.en?.substring(0, 200) || 'Manga on MangaDex',
-            source: MANGADEX_API,
-            sourceType: 'api',
-            url: `https://mangadex.org/manga/${manga.id}`,
-            publishedAt: manga.attributes.year ? `${manga.attributes.year}-01-01` : undefined,
-        });
-        return [...(latest.data?.map(mapManga) || []), ...(popular.data?.map(mapManga) || [])];
+        if (source.name === 'MangaDex') {
+            const [latest, popular] = await Promise.all([
+                rateLimitedFetch(`${source.url}/manga?order[latestUploadedChapter]=desc&limit=25&includes[]=cover_art`),
+                rateLimitedFetch(`${source.url}/manga?order[followedCount]=desc&limit=25&includes[]=cover_art`),
+            ]);
+            const mapManga = (manga) => ({
+                title: manga.attributes.title.en || manga.attributes.title['ja-ro'] || Object.values(manga.attributes.title)[0] || 'Unknown',
+                content: manga.attributes.description?.en?.substring(0, 200) || 'Manga on MangaDex',
+                source: source.url,
+                sourceType: 'api',
+                url: `https://mangadex.org/manga/${manga.id}`,
+                publishedAt: manga.attributes.year ? `${manga.attributes.year}-01-01` : undefined,
+            });
+            return [...(latest.data?.map(mapManga) || []), ...(popular.data?.map(mapManga) || [])];
+        }
+        if (source.name === 'Comick') {
+            const res = await fetch(`${source.url}/v1/manga?limit=25&page=1`, { signal: AbortSignal.timeout(10000) });
+            if (!res.ok)
+                throw new Error(`Comick API error: ${res.status}`);
+            const data = await res.json();
+            return data.manga?.map((m) => ({
+                title: m.title || m.slug || 'Unknown',
+                content: m.desc?.substring(0, 200) || 'Manga on Comick',
+                source: source.url,
+                sourceType: 'api',
+                url: `https://comick.fun/manga/${m.slug}`,
+                publishedAt: m.year ? `${m.year}-01-01` : undefined,
+            })) || [];
+        }
+        return [];
     }
     catch (error) {
-        console.error('Error fetching from MangaDex:', error);
+        console.error(`Error fetching from API ${source.name}:`, error);
         return [];
     }
 }
-export async function fetchComick() {
+async function fetchRSS(source) {
     try {
-        const res = await fetch(`${COMICK_API}/v1/manga?limit=25&page=1`, { signal: AbortSignal.timeout(10000) });
-        if (!res.ok)
-            throw new Error(`Comick API error: ${res.status}`);
-        const data = await res.json();
-        return data.manga?.map((m) => ({
-            title: m.title || m.slug || 'Unknown',
-            content: m.desc?.substring(0, 200) || 'Manga on Comick',
-            source: COMICK_API,
-            sourceType: 'api',
-            url: `https://comick.fun/manga/${m.slug}`,
-            publishedAt: m.year ? `${m.year}-01-01` : undefined,
+        const feed = await parser.parseURL(source.url);
+        return feed.items?.map(item => ({
+            title: item.title || '',
+            content: item.contentSnippet || item.content || '',
+            source: source.url,
+            sourceType: 'rss',
+            url: item.link,
+            publishedAt: item.pubDate,
         })) || [];
     }
     catch (error) {
-        console.error('Error fetching from Comick:', error);
+        console.error(`Error fetching RSS ${source.name}:`, error);
         return [];
     }
 }
-export async function fetchMALScraper() {
+async function fetchSite(source) {
     try {
-        const html = await fetchWithUA('https://myanimelist.net/topmanga.php');
+        const html = await fetchWithUA(source.url);
         const $ = cheerio.load(html);
         const items = [];
-        $('.ranking-list').each((_, el) => {
-            const title = $(el).find('.title a').text().trim();
-            const rank = $(el).find('.rank span').text().trim();
-            const link = $(el).find('.title a').attr('href');
-            if (title && link) {
-                items.push({
-                    title,
-                    content: `Rank #${rank} - Top Manga on MAL`,
-                    source: 'https://myanimelist.net',
-                    sourceType: 'site',
-                    url: link,
-                });
-            }
-        });
-        return items.slice(0, 25);
-    }
-    catch (error) {
-        console.error('Error fetching from MAL:', error);
-        return [];
-    }
-}
-export async function fetchMangaPlus() {
-    try {
-        const html = await fetchWithUA('https://manga-plus.com/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/manga/"]').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url) {
-                items.push({
-                    title,
-                    content: 'Manga on Manga Plus (Shueisha)',
-                    source: 'https://manga-plus.com',
-                    sourceType: 'platform',
-                    url,
-                });
-            }
-        });
-        return items.slice(0, 20);
-    }
-    catch (error) {
-        console.error('Error fetching from Manga Plus:', error);
-        return [];
-    }
-}
-export async function fetchCrunchyrollManga() {
-    try {
-        const html = await fetchWithUA('https://www.crunchyroll.com/manga');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/manga/"]').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url) {
-                items.push({
-                    title,
-                    content: 'Manga on Crunchyroll',
-                    source: 'https://www.crunchyroll.com',
-                    sourceType: 'platform',
-                    url: url.startsWith('http') ? url : `https://www.crunchyroll.com${url}`,
-                });
-            }
-        });
-        return items.slice(0, 20);
-    }
-    catch (error) {
-        console.error('Error fetching from Crunchyroll Manga:', error);
-        return [];
-    }
-}
-export async function fetchMangaUpdates() {
-    try {
-        const html = await fetchWithUA('https://www.mangaupdates.com/series.html');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('.serial_list').each((_, el) => {
-            const title = $(el).find('.title a').text().trim();
-            const link = $(el).find('.title a').attr('href');
-            const genre = $(el).find('.genre').text().trim();
-            if (title && link) {
-                items.push({
-                    title,
-                    content: genre ? `Genre: ${genre}` : 'Manga on MangaUpdates',
-                    source: 'https://www.mangaupdates.com',
-                    sourceType: 'site',
-                    url: `https://www.mangaupdates.com${link}`,
-                });
-            }
-        });
-        return items.slice(0, 25);
-    }
-    catch (error) {
-        console.error('Error fetching from MangaUpdates:', error);
-        return [];
-    }
-}
-export async function fetchAnimePlanetManga() {
-    try {
-        const html = await fetchWithUA('https://www.anime-planet.com/manga');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/manga/"]').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url) {
-                items.push({
-                    title,
-                    content: 'Manga on Anime-Planet',
-                    source: 'https://www.anime-planet.com',
-                    sourceType: 'site',
-                    url: `https://www.anime-planet.com${url}`,
-                });
-            }
-        });
-        return items.slice(0, 25);
-    }
-    catch (error) {
-        console.error('Error fetching from Anime-Planet:', error);
-        return [];
-    }
-}
-export async function fetchMangaBookshelf() {
-    try {
-        const html = await fetchWithUA('https://www.mangabookshelf.com/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/manga/"], .manga-item a').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url) {
-                items.push({
-                    title,
-                    content: 'Manga on MangaBookshelf',
-                    source: 'https://www.mangabookshelf.com',
-                    sourceType: 'site',
-                    url: url.startsWith('http') ? url : `https://www.mangabookshelf.com${url}`,
-                });
-            }
-        });
-        return items.slice(0, 20);
-    }
-    catch (error) {
-        console.error('Error fetching from MangaBookshelf:', error);
-        return [];
-    }
-}
-export async function fetchMyAnimeListManga() {
-    try {
-        const html = await fetchWithUA('https://myanimelist.net/manga.php');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/manga/"]').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url && title.length > 2) {
-                items.push({
-                    title,
-                    content: 'Manga on MyAnimeList',
-                    source: 'https://myanimelist.net',
-                    sourceType: 'site',
-                    url,
-                });
-            }
-        });
+        if (source.name === 'MyAnimeList') {
+            $('a[href*="/manga/"]').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url && title.length > 2) {
+                    items.push({
+                        title,
+                        content: 'Manga on MyAnimeList',
+                        source: source.url,
+                        sourceType: 'site',
+                        url,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'MangaUpdates') {
+            $('.serial_list').each((_, el) => {
+                const title = $(el).find('.title a').text().trim();
+                const link = $(el).find('.title a').attr('href');
+                const genre = $(el).find('.genre').text().trim();
+                if (title && link) {
+                    items.push({
+                        title,
+                        content: genre ? `Genre: ${genre}` : 'Manga on MangaUpdates',
+                        source: source.url,
+                        sourceType: 'site',
+                        url: `https://www.mangaupdates.com${link}`,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'Anime-Planet') {
+            $('a[href*="/manga/"]').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url) {
+                    items.push({
+                        title,
+                        content: 'Manga on Anime-Planet',
+                        source: source.url,
+                        sourceType: 'site',
+                        url: `https://www.anime-planet.com${url}`,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'WEBTOON') {
+            $('a[href*="/title/"]').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url && title.length > 2) {
+                    items.push({
+                        title,
+                        content: 'WEBTOON manga/webtoon',
+                        source: source.url,
+                        sourceType: 'platform',
+                        url: url.startsWith('http') ? url : `https://www.webtoons.com${url}`,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'Tapas') {
+            $('a[href*="/series/"]').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url) {
+                    items.push({
+                        title,
+                        content: 'Manga on Tapas',
+                        source: source.url,
+                        sourceType: 'platform',
+                        url: url.startsWith('http') ? url : `https://tapas.io${url}`,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'Inkr') {
+            $('a[href*="/titles/"]').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url && title.length > 2) {
+                    items.push({
+                        title,
+                        content: 'Comics on Inkr',
+                        source: source.url,
+                        sourceType: 'platform',
+                        url: url.startsWith('http') ? url : `https://www.inkr.com${url}`,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'Manga Plus') {
+            $('a[href*="/manga/"]').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url) {
+                    items.push({
+                        title,
+                        content: 'Manga on Manga Plus (Shueisha)',
+                        source: source.url,
+                        sourceType: 'platform',
+                        url,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'Crunchyroll Manga') {
+            $('a[href*="/manga/"]').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url) {
+                    items.push({
+                        title,
+                        content: 'Manga on Crunchyroll',
+                        source: source.url,
+                        sourceType: 'platform',
+                        url: url.startsWith('http') ? url : `https://www.crunchyroll.com${url}`,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'MangaBookshelf') {
+            $('a[href*="/manga/"], .manga-item a').each((_, el) => {
+                const title = $(el).text().trim();
+                const url = $(el).attr('href');
+                if (title && url) {
+                    items.push({
+                        title,
+                        content: 'Manga on MangaBookshelf',
+                        source: source.url,
+                        sourceType: 'site',
+                        url: url.startsWith('http') ? url : `https://www.mangabookshelf.com${url}`,
+                    });
+                }
+            });
+        }
+        else if (source.name === 'MAL Top Manga') {
+            $('.ranking-list').each((_, el) => {
+                const title = $(el).find('.title a').text().trim();
+                const rank = $(el).find('.rank span').text().trim();
+                const link = $(el).find('.title a').attr('href');
+                if (title && link) {
+                    items.push({
+                        title,
+                        content: `Rank #${rank} - Top Manga on MAL`,
+                        source: source.url,
+                        sourceType: 'site',
+                        url: link,
+                    });
+                }
+            });
+        }
         return items.slice(0, 30);
     }
     catch (error) {
-        console.error('Error fetching from MyAnimeList:', error);
-        return [];
-    }
-}
-export async function fetchMangaBookshelfRSS() {
-    try {
-        const feed = await parser.parseURL('https://www.mangabookshelf.com/feed/');
-        return feed.items?.map(item => ({
-            title: item.title || '',
-            content: item.contentSnippet || item.content || '',
-            source: 'https://www.mangabookshelf.com',
-            sourceType: 'rss',
-            url: item.link,
-            publishedAt: item.pubDate,
-        })) || [];
-    }
-    catch (error) {
-        console.error('Error fetching MangaBookshelf RSS:', error);
-        return [];
-    }
-}
-export async function fetchComicBookResourcesRSS() {
-    try {
-        const feed = await parser.parseURL('https://www.cbr.com/category/manga/feed/');
-        return feed.items?.map(item => ({
-            title: item.title || '',
-            content: item.contentSnippet || item.content || '',
-            source: 'https://www.cbr.com',
-            sourceType: 'rss',
-            url: item.link,
-            publishedAt: item.pubDate,
-        })) || [];
-    }
-    catch (error) {
-        console.error('Error fetching CBR RSS:', error);
-        return [];
-    }
-}
-export async function fetchWEBTOON() {
-    try {
-        const html = await fetchWithUA('https://www.webtoons.com/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/title/"]').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url && title.length > 2) {
-                items.push({
-                    title,
-                    content: 'WEBTOON manga/webtoon',
-                    source: 'https://www.webtoons.com',
-                    sourceType: 'platform',
-                    url: url.startsWith('http') ? url : `https://www.webtoons.com${url}`,
-                });
-            }
-        });
-        return items.slice(0, 25);
-    }
-    catch (error) {
-        console.error('Error fetching from WEBTOON:', error);
-        return [];
-    }
-}
-export async function fetchTapas() {
-    try {
-        const html = await fetchWithUA('https://tapas.io/series?category=manga');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/series/"]').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url) {
-                items.push({
-                    title,
-                    content: 'Manga on Tapas',
-                    source: 'https://tapas.io',
-                    sourceType: 'platform',
-                    url: url.startsWith('http') ? url : `https://tapas.io${url}`,
-                });
-            }
-        });
-        return items.slice(0, 25);
-    }
-    catch (error) {
-        console.error('Error fetching from Tapas:', error);
-        return [];
-    }
-}
-export async function fetchInkr() {
-    try {
-        const html = await fetchWithUA('https://www.inkr.com/');
-        const $ = cheerio.load(html);
-        const items = [];
-        $('a[href*="/titles/"]').each((_, el) => {
-            const title = $(el).text().trim();
-            const url = $(el).attr('href');
-            if (title && url && title.length > 2) {
-                items.push({
-                    title,
-                    content: 'Comics on Inkr',
-                    source: 'https://www.inkr.com',
-                    sourceType: 'platform',
-                    url: url.startsWith('http') ? url : `https://www.inkr.com${url}`,
-                });
-            }
-        });
-        return items.slice(0, 25);
-    }
-    catch (error) {
-        console.error('Error fetching from Inkr:', error);
+        console.error(`Error fetching site ${source.name}:`, error);
         return [];
     }
 }
 export async function crawlManga() {
-    const [mangaDex, comick, malScraper, mangaPlus, crunchyrollManga, mangaUpdates, animePlanet, mangaBookshelf, malManga, mangaBookshelfRSS, cbrRSS, webtoon, tapas, inkr,] = await Promise.all([
-        fetchMangaDex(),
-        fetchComick(),
-        fetchMALScraper(),
-        fetchMangaPlus(),
-        fetchCrunchyrollManga(),
-        fetchMangaUpdates(),
-        fetchAnimePlanetManga(),
-        fetchMangaBookshelf(),
-        fetchMyAnimeListManga(),
-        fetchMangaBookshelfRSS(),
-        fetchComicBookResourcesRSS(),
-        fetchWEBTOON(),
-        fetchTapas(),
-        fetchInkr(),
+    const sources = getMangaSources();
+    const [apis, rss, sites, social] = await Promise.all([
+        Promise.all(sources.apis.map(api => fetchFromAPI(api))),
+        Promise.all(sources.rss.map(rss => fetchRSS(rss))),
+        Promise.all(sources.sites.map(site => fetchSite(site))),
+        Promise.all(sources.social.map(site => fetchSite(site))),
     ]);
-    return [
-        ...mangaDex,
-        ...comick,
-        ...malScraper,
-        ...mangaPlus,
-        ...crunchyrollManga,
-        ...mangaUpdates,
-        ...animePlanet,
-        ...mangaBookshelf,
-        ...malManga,
-        ...mangaBookshelfRSS,
-        ...cbrRSS,
-        ...webtoon,
-        ...tapas,
-        ...inkr,
-    ];
+    return [...apis, ...rss, ...sites, ...social].flat();
+}
+export async function fetchMangaDex() {
+    const sources = getMangaSources();
+    const mangadex = sources.apis.find(s => s.name === 'MangaDex');
+    if (mangadex)
+        return fetchFromAPI(mangadex);
+    return [];
+}
+export async function fetchComick() {
+    const sources = getMangaSources();
+    const comick = sources.apis.find(s => s.name === 'Comick');
+    if (comick)
+        return fetchFromAPI(comick);
+    return [];
+}
+export async function fetchMALScraper() {
+    const sources = getMangaSources();
+    const mal = sources.sites.find(s => s.name === 'MAL Top Manga');
+    if (mal)
+        return fetchSite(mal);
+    return [];
+}
+export async function fetchMangaPlus() {
+    const sources = getMangaSources();
+    const mangaPlus = sources.sites.find(s => s.name === 'Manga Plus');
+    if (mangaPlus)
+        return fetchSite(mangaPlus);
+    return [];
+}
+export async function fetchCrunchyrollManga() {
+    const sources = getMangaSources();
+    const crunchyroll = sources.sites.find(s => s.name === 'Crunchyroll Manga');
+    if (crunchyroll)
+        return fetchSite(crunchyroll);
+    return [];
+}
+export async function fetchMangaUpdates() {
+    const sources = getMangaSources();
+    const updates = sources.sites.find(s => s.name === 'MangaUpdates');
+    if (updates)
+        return fetchSite(updates);
+    return [];
+}
+export async function fetchAnimePlanetManga() {
+    const sources = getMangaSources();
+    const animePlanet = sources.sites.find(s => s.name === 'Anime-Planet');
+    if (animePlanet)
+        return fetchSite(animePlanet);
+    return [];
+}
+export async function fetchMangaBookshelf() {
+    const sources = getMangaSources();
+    const bookshelf = sources.sites.find(s => s.name === 'MangaBookshelf');
+    if (bookshelf)
+        return fetchSite(bookshelf);
+    return [];
+}
+export async function fetchMyAnimeListManga() {
+    const sources = getMangaSources();
+    const mal = sources.sites.find(s => s.name === 'MyAnimeList');
+    if (mal)
+        return fetchSite(mal);
+    return [];
+}
+export async function fetchMangaBookshelfRSS() {
+    const sources = getMangaSources();
+    const rssSource = sources.rss.find(s => s.name === 'MangaBookshelf');
+    if (rssSource)
+        return fetchRSS(rssSource);
+    return [];
+}
+export async function fetchComicBookResourcesRSS() {
+    const sources = getMangaSources();
+    const rssSource = sources.rss.find(s => s.name === 'CBR');
+    if (rssSource)
+        return fetchRSS(rssSource);
+    return [];
+}
+export async function fetchWEBTOON() {
+    const sources = getMangaSources();
+    const webtoon = sources.sites.find(s => s.name === 'WEBTOON');
+    if (webtoon)
+        return fetchSite(webtoon);
+    return [];
+}
+export async function fetchTapas() {
+    const sources = getMangaSources();
+    const tapas = sources.sites.find(s => s.name === 'Tapas');
+    if (tapas)
+        return fetchSite(tapas);
+    return [];
+}
+export async function fetchInkr() {
+    const sources = getMangaSources();
+    const inkr = sources.sites.find(s => s.name === 'Inkr');
+    if (inkr)
+        return fetchSite(inkr);
+    return [];
 }

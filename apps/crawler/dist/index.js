@@ -9,6 +9,7 @@ import { crawlRumors } from './sources/rumors';
 import { SOURCES, getEnvConfig } from './sources/config';
 import { normalize, classifyItem } from '@otaku-calendar/core';
 import { deduplicate } from '@otaku-calendar/core';
+import { CrawlerQueue } from './utils/queue';
 const rssFromEnv = process.env.CRAWLER_RSS ? process.env.CRAWLER_RSS.split(',').filter(Boolean) : [];
 const rssFallback = [
     ...SOURCES.rss.news.map(f => f.url),
@@ -28,37 +29,44 @@ const CRAWLER_CONFIG = {
 };
 async function runCrawler() {
     console.log('🚀 Starting Otaku Calendar Crawler...');
-    console.log('📡 Loading sources from config...');
+    console.log('⏰ Time:', new Date().toISOString());
     const envConfig = getEnvConfig();
+    console.log(`📡 Loading sources from config...`);
     console.log(`   - ${envConfig.apis.split(',').length} APIs configured`);
     console.log(`   - ${envConfig.sites.split(',').length} sites configured`);
     console.log(`   - ${envConfig.rss.split(',').length} RSS feeds configured`);
-    const [animeResults, mangaResults, filmResults, seriesResults, manhwaResults, liveActionResults, rumorsResults] = await Promise.all([
-        crawlAnime(),
-        crawlManga(),
-        crawlFilms(),
-        crawlSeries(),
-        crawlManhwa(),
-        crawlLiveActions(),
-        crawlRumors(),
-    ]);
-    console.log(`📊 Crawled results:`);
-    console.log(`   - Anime: ${animeResults.length} items`);
-    console.log(`   - Manga: ${mangaResults.length} items`);
-    console.log(`   - Films: ${filmResults.length} items`);
-    console.log(`   - Series: ${seriesResults.length} items`);
-    console.log(`   - Manhwa: ${manhwaResults.length} items`);
-    console.log(`   - LiveActions: ${liveActionResults.length} items`);
-    console.log(`   - Rumors: ${rumorsResults.length} items`);
-    const allResults = [
-        ...animeResults,
-        ...mangaResults,
-        ...filmResults,
-        ...seriesResults,
-        ...manhwaResults,
-        ...liveActionResults,
-        ...rumorsResults,
-    ];
+    const queue = new CrawlerQueue();
+    queue.add('Anime', crawlAnime, 1);
+    queue.add('Manga', crawlManga, 1);
+    queue.add('Films', crawlFilms, 2);
+    queue.add('Series', crawlSeries, 2);
+    queue.add('Manhwa', crawlManhwa, 3);
+    queue.add('LiveActions', crawlLiveActions, 3);
+    queue.add('Rumors', crawlRumors, 4);
+    const results = await queue.processAll();
+    const counts = {
+        Anime: 0,
+        Manga: 0,
+        Films: 0,
+        Series: 0,
+        Manhwa: 0,
+        LiveActions: 0,
+        Rumors: 0,
+    };
+    const allResults = [];
+    results.forEach(result => {
+        counts[result.name] = result.items.length;
+        allResults.push(...result.items);
+    });
+    const total = allResults.length;
+    console.log(`\n📊 Crawled ${total} total items`);
+    console.log(`   - Anime: ${counts.Anime}`);
+    console.log(`   - Manga: ${counts.Manga}`);
+    console.log(`   - Films: ${counts.Films}`);
+    console.log(`   - Series: ${counts.Series}`);
+    console.log(`   - Manhwa: ${counts.Manhwa}`);
+    console.log(`   - LiveActions: ${counts.LiveActions}`);
+    console.log(`   - Rumors: ${counts.Rumors}`);
     console.log(`\n🔍 Normalizing ${allResults.length} items...`);
     const normalized = allResults.map(item => normalize(item));
     console.log('🏷️ Classifying items...');
