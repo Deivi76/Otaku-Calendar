@@ -32,6 +32,13 @@ apps/*/.turbo
 # =============================================================================
 /build
 /dist
+.next/
+.next
+*.next
+.turbo
+*.turbo/
+*build/
+*.dist/
 
 # =============================================================================
 # ARQUIVOS DIVERSOS
@@ -56,7 +63,6 @@ lerna-debug.log*
 # ARQUIVOS DE AMBIENTE
 # =============================================================================
 .env*
-!.env.example
 apps/*/.env.local
 apps/*/.env.production.local
 
