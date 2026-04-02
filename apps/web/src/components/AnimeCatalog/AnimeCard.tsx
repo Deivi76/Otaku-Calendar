@@ -24,24 +24,6 @@ const statusLabels: Record<string, string> = {
   upcoming: 'Em breve',
 };
 
-// Animation variants - simplified without custom bezier
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.4,
-    },
-  },
-  hover: {
-    y: -8,
-    transition: {
-      duration: 0.3,
-    },
-  },
-};
-
 export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
   const handleClick = () => {
     if (onClick && !isLoading) {
@@ -51,11 +33,17 @@ export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
 
   if (isLoading) {
     return (
-      <div className="relative overflow-hidden rounded-xl bg-otaku-bg-tertiary animate-pulse">
-        <div className="aspect-[2/3] w-full" />
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
-          <div className="h-4 bg-white/20 rounded w-3/4 mb-2" />
-          <div className="h-3 bg-white/10 rounded w-1/2" />
+      <div className="relative overflow-hidden rounded-xl bg-[#121212] animate-pulse group">
+        <div className="aspect-[2/3] w-full relative">
+          <div className="absolute inset-0 bg-gradient-to-t from-[#121212] to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-3">
+            <div className="h-4 bg-[#262626] rounded w-3/4 mb-2" />
+            <div className="h-3 bg-[#1a1a1a] rounded w-1/2" />
+          </div>
+        </div>
+        {/* Skeleton shimmer */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
         </div>
       </div>
     );
@@ -63,10 +51,10 @@ export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
 
   return (
     <motion.div
-      variants={cardVariants}
-      initial="hidden"
-      animate="visible"
-      whileHover="hover"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -8 }}
+      transition={{ duration: 0.3 }}
       className="relative overflow-hidden rounded-xl cursor-pointer group"
       onClick={handleClick}
     >
@@ -76,34 +64,36 @@ export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
           alt={anime.titleEnglish || anime.title}
           className="w-full h-full object-cover"
           loading="lazy"
+          whileHover={{ scale: 1.05 }}
+          transition={{ duration: 0.5 }}
         />
         
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
         
-        {/* Type Badge */}
+        {/* Type Badge - Top Right */}
         <motion.div
-          initial={{ opacity: 0, x: -10 }}
+          initial={{ opacity: 0, x: 20 }}
           whileHover={{ opacity: 1, x: 0 }}
           className="absolute top-3 right-3"
         >
           <span
-            className={`px-2.5 py-1 text-xs font-semibold rounded-lg ${
+            className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${
               typeColors[anime.type] || 'bg-gray-600'
-            }`}
+            } text-white`}
           >
             {anime.type}
           </span>
         </motion.div>
 
-        {/* Status Badge */}
+        {/* Status Badge - Top Left */}
         {anime.status && anime.status !== 'finished' && (
           <motion.div
-            initial={{ opacity: 0, x: 10 }}
+            initial={{ opacity: 0, x: -20 }}
             whileHover={{ opacity: 1, x: 0 }}
             className="absolute top-3 left-3"
           >
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-otaku-accent text-white">
+            <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md bg-[#ff4d00] text-white">
               {statusLabels[anime.status]}
             </span>
           </motion.div>
@@ -111,9 +101,10 @@ export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
 
         {/* Hover Overlay with Details */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: '100%' }}
           whileHover={{ opacity: 1, y: 0 }}
-          className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/95 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300"
+          transition={{ duration: 0.3 }}
+          className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/95 via-black/90 to-transparent translate-y-full group-hover:translate-y-0"
         >
           {anime.synopsis && (
             <p className="text-xs text-white/80 line-clamp-3 mb-3 leading-relaxed">
@@ -123,8 +114,8 @@ export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
           <div className="flex items-center justify-between">
             {anime.score && (
               <div className="flex items-center gap-1">
-                <span className="text-otaku-warning">★</span>
-                <span className="text-sm font-semibold text-white">{anime.score}</span>
+                <span className="text-yellow-400">★</span>
+                <span className="text-sm font-bold text-white">{anime.score}</span>
               </div>
             )}
             {anime.episodes && (
@@ -135,9 +126,9 @@ export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
           </div>
         </motion.div>
 
-        {/* Title & Meta (always visible at bottom) */}
+        {/* Title & Meta - Always visible at bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-3">
-          <h3 className="text-sm font-semibold text-white line-clamp-2 leading-snug">
+          <h3 className="text-sm font-bold text-white line-clamp-2 leading-snug">
             {anime.titleEnglish || anime.title}
           </h3>
           <div className="flex items-center gap-2 mt-1">
@@ -152,10 +143,20 @@ export function AnimeCard({ anime, onClick, isLoading }: AnimeCardProps) {
       </div>
 
       {/* Hover glow effect */}
-      <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+      <motion.div
+        className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+      >
         <div className="absolute inset-0 rounded-xl ring-1 ring-white/20" />
-        <div className="absolute -inset-2 bg-otaku-accent/20 blur-xl" />
-      </div>
+        <div className="absolute -inset-2 bg-[#ff4d00]/20 blur-xl" />
+      </motion.div>
+
+      {/* Corner accent on hover */}
+      <motion.div
+        className="absolute top-0 right-0 w-12 h-12 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{
+          background: 'linear-gradient(135deg, transparent 50%, rgba(255, 77, 0, 0.3) 50%)'
+        }}
+      />
     </motion.div>
   );
 }

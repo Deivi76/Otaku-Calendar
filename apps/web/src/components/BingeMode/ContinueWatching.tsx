@@ -29,7 +29,7 @@ function ProgressBadge({ progress }: { progress: WatchProgress }) {
     : 0;
 
   const statusColors: Record<string, string> = {
-    watching: 'bg-otaku-accent',
+    watching: 'bg-[#ff4d00]',
     completed: 'bg-green-600',
     paused: 'bg-yellow-600',
   };
@@ -48,9 +48,9 @@ function ProgressBadge({ progress }: { progress: WatchProgress }) {
         </span>
         <span>{percentage}%</span>
       </div>
-      <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+        <div className="h-1 bg-white/30 rounded-full overflow-hidden">
         <div 
-          className="h-full bg-otaku-accent rounded-full transition-all"
+          className="h-full bg-[#ff4d00] rounded-full transition-all"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -74,7 +74,7 @@ function ContinueWatchingCard({
       className="relative flex-shrink-0 w-40 sm:w-48 group"
     >
       <div className="relative aspect-[2/3] rounded-xl overflow-hidden shadow-card">
-        <div className="absolute inset-0 bg-otaku-bg-tertiary flex items-center justify-center">
+        <div className="absolute inset-0 bg-[#121212] flex items-center justify-center">
           <span className="text-4xl">🎬</span>
         </div>
         
@@ -85,7 +85,7 @@ function ContinueWatchingCard({
         </div>
       </div>
       
-      <p className="mt-2 text-sm text-otaku-text-secondary text-left line-clamp-2 group-hover:text-otaku-accent transition-colors">
+      <p className="mt-2 text-sm text-[#a1a1a1] text-left line-clamp-2 group-hover:text-[#ff4d00] transition-colors">
         Anime #{progress.anime_id}
       </p>
     </motion.button>
@@ -152,7 +152,13 @@ export function ContinueWatching({ onAnimeClick, isLoading }: ContinueWatchingPr
       className="container py-8"
     >
       <div className="flex items-center gap-3 mb-6">
-        <span className="w-1 h-8 bg-otaku-accent rounded-full" />
+        <motion.div 
+          className="w-1 h-8 bg-[#ff4d00] rounded-full"
+          animate={{ 
+            boxShadow: ['0 0 10px #ff4d00', '0 0 20px #ff4d00', '0 0 10px #ff4d00']
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
         <h2 className="text-2xl md:text-3xl font-bold text-white">
           Continuar Assistindo
         </h2>

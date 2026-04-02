@@ -73,7 +73,7 @@ export function CategorySection({
     return (
       <section className="mb-12">
         <h2 className="text-xl font-bold mb-6 text-white flex items-center gap-3">
-          <span className="w-1 h-6 bg-otaku-accent rounded-full" />
+          <span className="w-1 h-6 bg-[#ff4d00] rounded-full" />
           {title}
         </h2>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
@@ -95,15 +95,15 @@ export function CategorySection({
       {/* Section Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white flex items-center gap-3">
-          <span className="w-1 h-6 bg-otaku-accent rounded-full" />
+          <span className="w-1 h-6 bg-[#ff4d00] rounded-full" />
           {title}
-          <span className="text-sm font-normal text-otaku-text-secondary ml-2">
+          <span className="text-sm font-normal text-[#a1a1a1] ml-2">
             ({animeList.length})
           </span>
         </h2>
         <div className="flex items-center gap-2">
           {hasMore && (
-            <button className="text-sm text-otaku-accent hover:text-otaku-accent-hover transition-colors font-medium">
+            <button className="text-sm text-[#ff4d00] hover:hover:text-[#ff4d00] transition-colors font-medium">
               Ver todos
             </button>
           )}
@@ -120,7 +120,7 @@ export function CategorySection({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => scroll('left')}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-otaku-bg-secondary/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-otaku-accent transition-colors -ml-2 shadow-lg"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#121212]/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-[#ff4d00] transition-colors -ml-2 shadow-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -159,13 +159,13 @@ export function CategorySection({
               variants={itemVariants}
               className="flex-shrink-0 w-[160px] md:w-[180px] snap-start"
             >
-              <div className="aspect-[2/3] w-full rounded-xl bg-otaku-bg-secondary border-2 border-dashed border-otaku-border hover:border-otaku-accent transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group">
-                <div className="w-12 h-12 rounded-full bg-otaku-bg-tertiary group-hover:bg-otaku-accent transition-colors flex items-center justify-center">
-                  <svg className="w-6 h-6 text-otaku-text-secondary group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="aspect-[2/3] w-full rounded-xl bg-[#121212] border-2 border-dashed border-otaku-border hover:border-otaku-accent transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group">
+                <div className="w-12 h-12 rounded-full bg-otaku-bg-tertiary group-hover:bg-[#ff4d00] transition-colors flex items-center justify-center">
+                  <svg className="w-6 h-6 text-[#a1a1a1] group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                 </div>
-                <span className="text-sm font-medium text-otaku-text-secondary group-hover:text-white transition-colors">
+                <span className="text-sm font-medium text-[#a1a1a1] group-hover:text-white transition-colors">
                   Ver mais
                 </span>
               </div>
@@ -181,7 +181,7 @@ export function CategorySection({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => scroll('right')}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-otaku-bg-secondary/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-otaku-accent transition-colors -mr-2 shadow-lg"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#121212]/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-[#ff4d00] transition-colors -mr-2 shadow-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

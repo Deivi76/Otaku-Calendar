@@ -155,13 +155,13 @@ export function RecommendationCarousel({
         <h2 className="text-xl font-bold text-white flex items-center gap-3">
           <span className="w-1 h-6 bg-otaku-accent rounded-full" />
           {title}
-          <span className="text-sm font-normal text-otaku-text-secondary ml-2">
+          <span className="text-sm font-normal text-[#a1a1a1] ml-2">
             ({recommendations.length})
           </span>
         </h2>
         <a
           href="/para-voce"
-          className="text-sm text-otaku-accent hover:text-otaku-accent-hover transition-colors font-medium"
+          className="text-sm text-[#ff4d00] hover:text-[#ff4d00]-hover transition-colors font-medium"
         >
           Ver todas
         </a>
@@ -177,7 +177,7 @@ export function RecommendationCarousel({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => scroll('left')}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-otaku-bg-secondary/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-otaku-accent transition-colors -ml-2 shadow-lg"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#121212]/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-otaku-accent transition-colors -ml-2 shadow-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -225,7 +225,7 @@ export function RecommendationCarousel({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => scroll('right')}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-otaku-bg-secondary/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-otaku-accent transition-colors -mr-2 shadow-lg"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#121212]/90 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-otaku-accent transition-colors -mr-2 shadow-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

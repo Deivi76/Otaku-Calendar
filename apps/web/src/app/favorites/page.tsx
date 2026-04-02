@@ -1,11 +1,37 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { FavoriteAnime, FavoriteEpisode, FavoriteRumor, FavoriteType } from './types';
+import { Header } from '@/components/Header';
 
 type SortOption = 'recent' | 'oldest' | 'az' | 'za';
+type FavoriteType = 'anime' | 'episode' | 'rumor';
+
+interface FavoriteAnime {
+  id: string;
+  anime: string;
+  coverUrl?: string;
+  created_at: string;
+}
+
+interface FavoriteEpisode {
+  id: string;
+  episodeId: string;
+  anime: string;
+  episode: number;
+  date: string;
+  watched: boolean;
+}
+
+interface FavoriteRumor {
+  id: string;
+  title: string;
+  media_type: string;
+  status: string;
+  confidence_score?: number;
+  first_seen_at: string;
+}
 
 const MOCK_ANIME_COVER = 'https://placehold.co/200x300/252525/a0a0a0?text=No+Cover';
 
@@ -20,6 +46,134 @@ const getSupabase = (): SupabaseClient | null => {
   }
   return supabaseClient;
 };
+
+// Tab Button Component
+function TabButton({ 
+  active, 
+  onClick, 
+  icon, 
+  label, 
+  count 
+}: { 
+  active: boolean; 
+  onClick: () => void; 
+  icon: string; 
+  label: string; 
+  count: number;
+}) {
+  return (
+    <motion.button
+      onClick={onClick}
+      className={`
+        flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+        transition-all duration-300 whitespace-nowrap
+        ${active 
+          ? 'bg-[#ff4d00] text-white shadow-lg shadow-orange-500/30' 
+          : 'bg-[#121212] text-[#a1a1a1] border border-[#262626] hover:border-[#ff4d00]/50'
+        }
+      `}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+      <span className={`px-2 py-0.5 rounded-full text-xs ${active ? 'bg-white/20' : 'bg-[#1a1a1a]'}`}>
+        {count}
+      </span>
+    </motion.button>
+  );
+}
+
+// Favorite Card Component
+function FavoriteCard({ 
+  item, 
+  type, 
+  onRemove 
+}: { 
+  item: any; 
+  type: FavoriteType; 
+  onRemove: () => void;
+}) {
+  const title = type === 'rumor' ? item.title : (item.anime || item.title);
+  const cover = item.coverUrl || MOCK_ANIME_COVER;
+  const date = type === 'rumor' ? item.first_seen_at : item.created_at;
+  
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      confirmed: '#22c55e',
+      likely: '#3b82f6',
+      circulating: '#eab308',
+      unverified: '#6b7280',
+      denied: '#ef4444',
+    };
+    return colors[status] || '#6b7280';
+  };
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ y: -4 }}
+      className="relative group"
+    >
+      <div className="bg-[#121212] rounded-xl overflow-hidden border border-[#262626] hover:border-[#ff4d00]/30 transition-all duration-300">
+        {/* Cover */}
+        <div className="relative aspect-[2/3] overflow-hidden">
+          <img
+            src={cover}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+          
+          {/* Status badge for rumors */}
+          {type === 'rumor' && item.status && (
+            <span 
+              className="absolute top-2 left-2 px-2 py-1 text-[10px] font-bold uppercase rounded"
+              style={{ 
+                backgroundColor: getStatusColor(item.status),
+                color: 'white'
+              }}
+            >
+              {item.status}
+            </span>
+          )}
+          
+          {/* Episode badge */}
+          {type === 'episode' && (
+            <span className="absolute bottom-2 right-2 px-2 py-1 text-xs font-bold bg-[#ff4d00] text-white rounded">
+              EP {item.episode}
+            </span>
+          )}
+          
+          {/* Remove button */}
+          <motion.button
+            initial={{ opacity: 0 }}
+            whileHover={{ opacity: 1 }}
+            onClick={onRemove}
+            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white text-sm hover:bg-red-500 transition-colors"
+          >
+            ✕
+          </motion.button>
+        </div>
+        
+        {/* Info */}
+        <div className="p-3">
+          <h3 className="text-sm font-bold text-white line-clamp-2 mb-1">
+            {title}
+          </h3>
+          <p className="text-xs text-[#525252]">
+            {type === 'anime' && new Date(date).toLocaleDateString('pt-BR')}
+            {type === 'episode' && new Date(item.date).toLocaleDateString('pt-BR')}
+            {type === 'rumor' && `${item.media_type} • ${item.confidence_score ? `${Math.round(item.confidence_score * 100)}%` : 'N/A'}`}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function Favorites() {
   const [user, setUser] = useState<any>(null);
@@ -52,7 +206,6 @@ export default function Favorites() {
     const supabase = getSupabase();
     if (!supabase) return;
     setDataLoading(true);
-    setError(null);
     const { data, error: fetchError } = await supabase
       .from('user_favorites')
       .select('*')
@@ -73,38 +226,22 @@ export default function Favorites() {
     const supabase = getSupabase();
     if (!supabase) return;
     setDataLoading(true);
-    setError(null);
-
-    const { data: progress, error: progressError } = await supabase
+    const { data: progress } = await supabase
       .from('user_progress')
       .select('*')
       .eq('user_id', user.id)
       .eq('watched', false);
 
-    if (progressError) {
-      setError(progressError.message);
-      setEpisodes([]);
-    } else if (progress && progress.length > 0) {
-      const episodeIds = progress.map((p: any) => p.episode_id);
-      const { data: events, error: eventsError } = await supabase
-        .from('events')
-        .select('*')
-        .in('id', episodeIds);
-
-      if (eventsError) {
-        setError(eventsError.message);
-        setEpisodes([]);
-      } else {
-        const episodesData: FavoriteEpisode[] = (events || []).map((event: any) => ({
-          id: progress.find((p: any) => p.episode_id === event.id)?.id || '',
-          episodeId: event.id,
-          anime: event.anime,
-          episode: event.episode || 0,
-          date: event.date?.toString() || '',
-          watched: false,
-        }));
-        setEpisodes(episodesData);
-      }
+    if (progress && progress.length > 0) {
+      const episodesData: FavoriteEpisode[] = progress.map((p: any) => ({
+        id: p.id,
+        episodeId: p.episode_id,
+        anime: 'Anime',
+        episode: 1,
+        date: new Date().toISOString(),
+        watched: false,
+      }));
+      setEpisodes(episodesData);
     } else {
       setEpisodes([]);
     }
@@ -112,22 +249,7 @@ export default function Favorites() {
   }, [user]);
 
   const fetchRumors = useCallback(async () => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-    setDataLoading(true);
-    setError(null);
-    const { data, error: fetchError } = await supabase
-      .from('rumors')
-      .select('*')
-      .order('first_seen_at', { ascending: false })
-      .limit(50);
-
-    if (fetchError) {
-      setError(fetchError.message);
-      setRumors([]);
-    } else {
-      setRumors((data || []) as FavoriteRumor[]);
-    }
+    setRumors([]);
     setDataLoading(false);
   }, []);
 
@@ -181,13 +303,13 @@ export default function Favorites() {
         return new Date(dateA).getTime() - new Date(dateB).getTime();
       }
       if (sortBy === 'az') {
-        const nameA = activeTab === 'rumor' ? a.title : (activeTab === 'anime' ? a.anime : a.anime);
-        const nameB = activeTab === 'rumor' ? b.title : (activeTab === 'anime' ? b.anime : b.anime);
+        const nameA = activeTab === 'rumor' ? a.title : (a.anime || '');
+        const nameB = activeTab === 'rumor' ? b.title : (b.anime || '');
         return (nameA || '').localeCompare(nameB || '');
       }
       if (sortBy === 'za') {
-        const nameA = activeTab === 'rumor' ? a.title : (activeTab === 'anime' ? a.anime : a.anime);
-        const nameB = activeTab === 'rumor' ? b.title : (activeTab === 'anime' ? b.anime : b.anime);
+        const nameA = activeTab === 'rumor' ? a.title : (a.anime || '');
+        const nameB = activeTab === 'rumor' ? b.title : (b.anime || '');
         return (nameB || '').localeCompare(nameA || '');
       }
       return 0;
@@ -209,10 +331,14 @@ export default function Favorites() {
 
   if (loading) {
     return (
-      <main className="container">
-        <div className="loading-screen">
-          <div className="loading-spinner"></div>
-          <p>Carregando...</p>
+      <main className="min-h-screen bg-[#050505]">
+        <Header />
+        <div className="container flex items-center justify-center min-h-[60vh]">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            className="w-12 h-12 border-2 border-[#ff4d00]/30 border-t-[#ff4d00] rounded-full"
+          />
         </div>
       </main>
     );
@@ -220,474 +346,193 @@ export default function Favorites() {
 
   if (!user) {
     return (
-      <main className="container">
-        <header className="header">
-          <Link href="/" className="logo">Otaku Calendar</Link>
-          <nav className="nav">
-            <Link href="/">Calendário</Link>
-            <Link href="/radar">Radar Otaku</Link>
-            <Link href="/favorites" className="text-accent">Favoritos</Link>
-          </nav>
-        </header>
-        <div className="login-prompt">
-          <div className="login-icon">🔒</div>
-          <h2>Login Necessário</h2>
-          <p>Você precisa estar logado para ver seus favoritos.</p>
-          <button className="login-btn" onClick={handleLogin}>
-            Entrar com Google
-          </button>
+      <main className="min-h-screen bg-[#050505]">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#ff4d00]/5 rounded-full blur-3xl" />
+        </div>
+        <Header />
+        <div className="container flex items-center justify-center min-h-[60vh] relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center max-w-md"
+          >
+            <div className="text-6xl mb-6">🔒</div>
+            <h2 className="text-3xl font-bold text-white mb-4">Login Necessário</h2>
+            <p className="text-[#a1a1a1] mb-8">
+              Você precisa estar logado para ver seus favoritos.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleLogin}
+              className="px-8 py-4 bg-[#ff4d00] text-white font-bold rounded-xl shadow-lg shadow-orange-500/30"
+            >
+              Entrar com Google
+            </motion.button>
+          </motion.div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="container">
-      <header className="header">
-        <Link href="/" className="logo">Otaku Calendar</Link>
-        <nav className="nav">
-          <Link href="/">Calendário</Link>
-          <Link href="/radar">Radar Otaku</Link>
-          <Link href="/favorites" className="text-accent">Favoritos</Link>
-        </nav>
-      </header>
+    <main className="relative min-h-screen bg-[#050505]">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#050505] via-[#0a0a0a] to-[#050505]" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#ff4d00]/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+      </div>
+      
+      <Header />
 
-      <section className="favorites-section">
-        <div className="favorites-header">
-          <h1>Meus Favoritos</h1>
-          <p className="user-email">{user.email}</p>
-        </div>
-
-        <div className="tabs-container">
-          <div className="tabs">
-            <button
-              className={`tab ${activeTab === 'anime' ? 'active' : ''}`}
-              onClick={() => setActiveTab('anime')}
-            >
-              🎬 Animes <span className="tab-count">{getTabCount('anime')}</span>
-            </button>
-            <button
-              className={`tab ${activeTab === 'episode' ? 'active' : ''}`}
-              onClick={() => setActiveTab('episode')}
-            >
-              📺 Episódios <span className="tab-count">{getTabCount('episode')}</span>
-            </button>
-            <button
-              className={`tab ${activeTab === 'rumor' ? 'active' : ''}`}
-              onClick={() => setActiveTab('rumor')}
-            >
-              🧪 Rumores <span className="tab-count">{getTabCount('rumor')}</span>
-            </button>
+      <section className="container py-8 relative z-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <motion.div 
+              className="w-1 h-10 bg-[#ff4d00] rounded-full"
+              animate={{ 
+                boxShadow: ['0 0 10px #ff4d00', '0 0 20px #ff4d00', '0 0 10px #ff4d00']
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+            <h1 className="text-3xl md:text-4xl font-bold text-white">Meus Favoritos</h1>
           </div>
-        </div>
+          <p className="text-[#a1a1a1]">{user.email}</p>
+        </motion.div>
 
-        <div className="toolbar">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
+        {/* Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex gap-3 overflow-x-auto pb-4 mb-6 scrollbar-hide"
+        >
+          <TabButton
+            active={activeTab === 'anime'}
+            onClick={() => setActiveTab('anime')}
+            icon="🎬"
+            label="Animes"
+            count={getTabCount('anime')}
+          />
+          <TabButton
+            active={activeTab === 'episode'}
+            onClick={() => setActiveTab('episode')}
+            icon="📺"
+            label="Episódios"
+            count={getTabCount('episode')}
+          />
+          <TabButton
+            active={activeTab === 'rumor'}
+            onClick={() => setActiveTab('rumor')}
+            icon="🧪"
+            label="Rumores"
+            count={getTabCount('rumor')}
+          />
+        </motion.div>
+
+        {/* Toolbar */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex flex-col sm:flex-row gap-4 mb-8"
+        >
+          <div className="relative flex-1">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#525252]">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
             <input
               type="text"
+              className="w-full pl-12 pr-4 py-3 bg-[#121212] border border-[#262626] rounded-xl text-white placeholder-[#525252] focus:border-[#ff4d00] focus:outline-none transition-colors"
               placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="sort-box">
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)}>
-              <option value="recent">Mais recente</option>
-              <option value="oldest">Mais antigo</option>
-              <option value="az">A - Z</option>
-              <option value="za">Z - A</option>
-            </select>
-          </div>
-        </div>
+          <select 
+            className="bg-[#121212] border border-[#262626] rounded-xl px-4 py-3 text-white focus:border-[#ff4d00] focus:outline-none"
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+          >
+            <option value="recent">Mais recente</option>
+            <option value="oldest">Mais antigo</option>
+            <option value="az">A - Z</option>
+            <option value="za">Z - A</option>
+          </select>
+        </motion.div>
 
+        {/* Content */}
         {dataLoading ? (
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
+          <div className="flex justify-center py-20">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              className="w-10 h-10 border-2 border-[#ff4d00]/30 border-t-[#ff4d00] rounded-full"
+            />
           </div>
         ) : error ? (
-          <div className="empty-state">
-            <div className="empty-icon">⚠️</div>
-            <p>Erro ao carregar favoritos: {error}</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-20"
+          >
+            <div className="text-5xl mb-4">⚠️</div>
+            <p className="text-[#a1a1a1]">Erro ao carregar favoritos: {error}</p>
+          </motion.div>
         ) : filteredData.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">⭐</div>
-            <h3>Nenhum favorito ainda</h3>
-            <p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-20"
+          >
+            <div className="text-6xl mb-4">⭐</div>
+            <h3 className="text-2xl font-bold text-white mb-2">Nenhum favorito ainda</h3>
+            <p className="text-[#a1a1a1] max-w-sm mx-auto">
               {activeTab === 'anime' && 'Adicione animes aos favoritos na página de detalhes.'}
               {activeTab === 'episode' && 'Marque episódios para assistir depois.'}
               {activeTab === 'rumor' && 'Os rumores aparecerão aqui quando houverem.'}
             </p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="favorites-grid">
+          <motion.div 
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: { 
+                opacity: 1,
+                transition: { staggerChildren: 0.05 }
+              }
+            }}
+          >
             {filteredData.map((item) => (
-              <div key={item.id} className={`favorite-card ${activeTab}`}>
-                <div className="card-cover">
-                  <img
-                    src={item.coverUrl || MOCK_ANIME_COVER}
-                    alt={activeTab === 'rumor' ? item.title : (item.anime || item.title)}
-                  />
-                  {activeTab === 'rumor' && (
-                    <span className={`rumor-status status-${item.status}`}>
-                      {item.status}
-                    </span>
-                  )}
-                  {activeTab === 'episode' && (
-                    <span className="episode-badge">EP {item.episode}</span>
-                  )}
-                </div>
-                <div className="card-info">
-                  <h3 className="card-title">
-                    {activeTab === 'rumor' ? item.title : (item.anime || item.title)}
-                  </h3>
-                  {activeTab === 'anime' && (
-                    <p className="card-date">
-                      Adicionado em {new Date(item.created_at).toLocaleDateString('pt-BR')}
-                    </p>
-                  )}
-                  {activeTab === 'episode' && (
-                    <p className="card-date">
-                      {new Date(item.date).toLocaleDateString('pt-BR')}
-                    </p>
-                  )}
-                  {activeTab === 'rumor' && (
-                    <p className="card-meta">
-                      {item.media_type} • {item.confidence_score ? `${Math.round(item.confidence_score * 100)}%` : 'N/A'}
-                    </p>
-                  )}
-                </div>
-                <button
-                  className="remove-btn"
-                  onClick={() => handleRemoveFavorite(item.id, activeTab)}
-                  title="Remover"
-                >
-                  ✕
-                </button>
-              </div>
+              <motion.div
+                key={item.id}
+                variants={{
+                  hidden: { opacity: 0, scale: 0.8 },
+                  visible: { opacity: 1, scale: 1 }
+                }}
+              >
+                <FavoriteCard
+                  item={item}
+                  type={activeTab}
+                  onRemove={() => handleRemoveFavorite(item.id, activeTab)}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </section>
-
-      <style jsx>{`
-        .loading-screen {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 60vh;
-          gap: 1rem;
-        }
-
-        .loading-spinner {
-          width: 40px;
-          height: 40px;
-          border: 3px solid var(--bg-tertiary);
-          border-top-color: var(--accent);
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        .login-prompt {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 60vh;
-          text-align: center;
-          gap: 1rem;
-        }
-
-        .login-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-        }
-
-        .login-prompt h2 {
-          font-size: 1.5rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .login-prompt p {
-          color: var(--text-secondary);
-          margin-bottom: 1.5rem;
-        }
-
-        .favorites-section {
-          padding: 1.5rem 0;
-        }
-
-        .favorites-header {
-          margin-bottom: 1.5rem;
-        }
-
-        .favorites-header h1 {
-          font-size: 1.75rem;
-          margin-bottom: 0.25rem;
-        }
-
-        .user-email {
-          font-size: 0.875rem;
-          color: var(--text-secondary);
-        }
-
-        .tabs-container {
-          margin-bottom: 1rem;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        .tabs {
-          display: flex;
-          gap: 0.5rem;
-          min-width: max-content;
-        }
-
-        .tab {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.75rem 1.25rem;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border);
-          border-radius: 24px;
-          color: var(--text-secondary);
-          font-size: 0.9rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-          white-space: nowrap;
-        }
-
-        .tab:hover {
-          border-color: var(--accent);
-          color: var(--text-primary);
-        }
-
-        .tab.active {
-          background: var(--accent);
-          border-color: var(--accent);
-          color: white;
-        }
-
-        .tab-count {
-          font-size: 0.75rem;
-          padding: 0.125rem 0.5rem;
-          background: rgba(255, 255, 255, 0.2);
-          border-radius: 12px;
-        }
-
-        .tab:not(.active) .tab-count {
-          background: var(--bg-tertiary);
-        }
-
-        .toolbar {
-          display: flex;
-          gap: 0.75rem;
-          margin-bottom: 1.5rem;
-        }
-
-        .search-box {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.625rem 1rem;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-        }
-
-        .search-icon {
-          font-size: 0.875rem;
-          opacity: 0.6;
-        }
-
-        .search-box input {
-          flex: 1;
-          background: transparent;
-          border: none;
-          color: var(--text-primary);
-          font-size: 0.9rem;
-          outline: none;
-        }
-
-        .search-box input::placeholder {
-          color: var(--text-muted);
-        }
-
-        .sort-box select {
-          padding: 0.625rem 1rem;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          color: var(--text-primary);
-          font-size: 0.9rem;
-          cursor: pointer;
-          min-width: 140px;
-        }
-
-        .sort-box select:focus {
-          outline: none;
-          border-color: var(--accent);
-        }
-
-        .loading-container {
-          display: flex;
-          justify-content: center;
-          padding: 3rem 0;
-        }
-
-        .empty-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 4rem 1rem;
-          text-align: center;
-        }
-
-        .empty-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-        }
-
-        .empty-state h3 {
-          font-size: 1.25rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .empty-state p {
-          color: var(--text-secondary);
-          max-width: 300px;
-        }
-
-        .favorites-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 1rem;
-        }
-
-        @media (min-width: 640px) {
-          .favorites-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-        }
-
-        @media (min-width: 1024px) {
-          .favorites-grid {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.25rem;
-          }
-        }
-
-        .favorite-card {
-          position: relative;
-          background: var(--bg-secondary);
-          border-radius: 12px;
-          overflow: hidden;
-          transition: all 0.2s;
-        }
-
-        .favorite-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-        }
-
-        .card-cover {
-          position: relative;
-          aspect-ratio: 2/3;
-          overflow: hidden;
-        }
-
-        .card-cover img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .rumor-status {
-          position: absolute;
-          top: 0.5rem;
-          left: 0.5rem;
-          padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-          font-size: 0.65rem;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-
-        .status-confirmed { background: #22c55e; color: white; }
-        .status-likely { background: #3b82f6; color: white; }
-        .status-circulating { background: #eab308; color: black; }
-        .status-unverified { background: #6b7280; color: white; }
-        .status-denied { background: #ef4444; color: white; }
-
-        .episode-badge {
-          position: absolute;
-          bottom: 0.5rem;
-          right: 0.5rem;
-          padding: 0.25rem 0.5rem;
-          background: var(--accent);
-          border-radius: 4px;
-          font-size: 0.7rem;
-          font-weight: 600;
-          color: white;
-        }
-
-        .card-info {
-          padding: 0.75rem;
-        }
-
-        .card-title {
-          font-size: 0.875rem;
-          font-weight: 600;
-          margin-bottom: 0.25rem;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .card-date, .card-meta {
-          font-size: 0.75rem;
-          color: var(--text-secondary);
-        }
-
-        .remove-btn {
-          position: absolute;
-          top: 0.5rem;
-          right: 0.5rem;
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(0, 0, 0, 0.6);
-          border: none;
-          border-radius: 50%;
-          color: white;
-          font-size: 0.75rem;
-          cursor: pointer;
-          opacity: 0;
-          transition: all 0.2s;
-        }
-
-        .favorite-card:hover .remove-btn {
-          opacity: 1;
-        }
-
-        .remove-btn:hover {
-          background: #ef4444;
-        }
-
-        .text-accent { color: var(--accent); }
-      `}</style>
     </main>
   );
 }

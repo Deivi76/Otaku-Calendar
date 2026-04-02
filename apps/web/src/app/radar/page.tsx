@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import { Header } from '@/components/Header';
 
 type MediaType = 'anime' | 'manga' | 'manhwa' | 'live_action' | 'film';
 type RumorStatus = 'all' | 'unverified' | 'circulating' | 'likely' | 'confirmed';
@@ -35,102 +37,62 @@ const MOCK_RUMORS: Rumor[] = [
   { id: 12, title: 'Spy x Family Season 3', mediaType: 'anime', status: 'confirmed', confidence: 'high', sources: 7, date: '2026-03-14', description: 'Terceira temporada confirmada.', denied: false },
 ];
 
-const MEDIA_TYPES: { value: MediaType; label: string }[] = [
-  { value: 'anime', label: 'Anime' },
-  { value: 'manga', label: 'Manga' },
-  { value: 'manhwa', label: 'Manhwa' },
-  { value: 'live_action', label: 'Live Action' },
-  { value: 'film', label: 'Filme' },
+const MEDIA_TYPES: { value: MediaType; label: string; icon: string }[] = [
+  { value: 'anime', label: 'Anime', icon: '🎬' },
+  { value: 'manga', label: 'Manga', icon: '📚' },
+  { value: 'manhwa', label: 'Manhwa', icon: '📖' },
+  { value: 'live_action', label: 'Live Action', icon: '🎭' },
+  { value: 'film', label: 'Filme', icon: '🎥' },
 ];
 
-const STATUS_OPTIONS: { value: RumorStatus; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'unverified', label: 'Não Verificado' },
-  { value: 'circulating', label: 'Circulando' },
-  { value: 'likely', label: 'Provável' },
-  { value: 'confirmed', label: 'Confirmado' },
+const STATUS_OPTIONS: { value: RumorStatus; label: string; color: string }[] = [
+  { value: 'all', label: 'Todos', color: '#a1a1a1' },
+  { value: 'unverified', label: 'Não Verificado', color: '#6b7280' },
+  { value: 'circulating', label: 'Circulando', color: '#fbbf24' },
+  { value: 'likely', label: 'Provável', color: '#60a5fa' },
+  { value: 'confirmed', label: 'Confirmado', color: '#4ade80' },
 ];
 
-const CONFIDENCE_OPTIONS: { value: ConfidenceLevel; label: string }[] = [
-  { value: 'low', label: 'Baixa' },
-  { value: 'medium', label: 'Média' },
-  { value: 'high', label: 'Alta' },
+const CONFIDENCE_OPTIONS: { value: ConfidenceLevel; label: string; color: string }[] = [
+  { value: 'low', label: 'Baixa', color: '#f87171' },
+  { value: 'medium', label: 'Média', color: '#facc15' },
+  { value: 'high', label: 'Alta', color: '#4ade80' },
 ];
 
-interface VerticalPickerProps<T extends string> {
-  label: string;
-  options: { value: T; label: string }[];
+// Tab Filter Component
+function FilterTabs<T extends string>({
+  options,
+  selectedValue,
+  onChange,
+}: {
+  options: { value: T; label: string; icon?: string; color?: string }[];
   selectedValue: T;
   onChange: (value: T) => void;
-}
-
-function VerticalPicker<T extends string>({ label, options, selectedValue, onChange }: VerticalPickerProps<T>) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isScrolling, setIsScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
-
-  const itemHeight = 48;
-
-  const scrollToItem = useCallback((value: string) => {
-    const index = options.findIndex(o => o.value === value);
-    if (containerRef.current && index !== -1) {
-      const targetScroll = index * itemHeight;
-      containerRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
-    }
-  }, [options]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      setIsScrolling(true);
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-      scrollTimeoutRef.current = setTimeout(() => {
-        setIsScrolling(false);
-        const scrollTop = container.scrollTop;
-        const centerIndex = Math.round(scrollTop / itemHeight);
-        const validIndex = Math.max(0, Math.min(centerIndex, options.length - 1));
-        const newValue = options[validIndex]?.value;
-        if (newValue && newValue !== selectedValue) {
-          onChange(newValue as T);
-        }
-      }, 100);
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-  }, [options, selectedValue, onChange]);
-
-  useEffect(() => {
-    scrollToItem(selectedValue);
-  }, []);
-
+}) {
   return (
-    <div className="picker-wrapper">
-      <span className="picker-label">{label}</span>
-      <div className="picker-container" ref={containerRef}>
-        {options.map((option) => (
-          <div
+    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      {options.map((option) => {
+        const isActive = selectedValue === option.value;
+        return (
+          <motion.button
             key={option.value}
-            className={`picker-item ${selectedValue === option.value ? 'active' : ''}`}
-            onClick={() => {
-              scrollToItem(option.value);
-              onChange(option.value as T);
-            }}
+            onClick={() => onChange(option.value as T)}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
+              transition-all duration-300 whitespace-nowrap
+              ${isActive 
+                ? 'bg-[#ff4d00] text-white shadow-lg shadow-orange-500/30' 
+                : 'bg-[#121212] text-[#a1a1a1] border border-[#262626] hover:border-[#ff4d00]/50'
+              }
+            `}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
+            {option.icon && <span>{option.icon}</span>}
             {option.label}
-          </div>
-        ))}
-      </div>
-      <div className="picker-indicator" />
+          </motion.button>
+        );
+      })}
     </div>
   );
 }
@@ -187,482 +149,263 @@ export default function Radar() {
     return { total, byStatus };
   }, [selectedType, selectedStatus]);
 
-  const getStatusColor = (status: RumorStatus) => {
-    const colors: Record<RumorStatus, string> = {
-      all: 'bg-gray-500',
-      unverified: 'bg-gray-500',
-      circulating: 'bg-yellow-500',
-      likely: 'bg-blue-500',
-      confirmed: 'bg-green-500',
-    };
-    return colors[status];
+  const getStatusInfo = (status: RumorStatus) => {
+    return STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
   };
 
-  const getConfidenceColor = (confidence: ConfidenceLevel) => {
-    const colors = {
-      low: '#f87171',
-      medium: '#facc15',
-      high: '#4ade80',
-    };
-    return colors[confidence];
+  const getConfidenceInfo = (confidence: ConfidenceLevel) => {
+    return CONFIDENCE_OPTIONS.find(c => c.value === confidence) || CONFIDENCE_OPTIONS[0];
   };
 
   return (
-    <main className="container">
-      <header className="header">
-        <Link href="/" className="logo">Otaku Calendar</Link>
-        <nav className="nav">
-          <Link href="/">Calendário</Link>
-          <Link href="/radar" className="text-accent">Radar Otaku</Link>
-          <Link href="/favorites">Favoritos</Link>
-          <button className="login-btn">Login</button>
-        </nav>
-      </header>
+    <main className="relative min-h-screen bg-[#050505]">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#050505] via-[#0a0a0a] to-[#050505]" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#ff4d00]/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+      </div>
+      
+      <Header showSearch />
 
-      <section className="py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Radar Otaku</h1>
-          <p className="text-text-secondary">
+      <section className="py-8 container relative z-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <motion.div 
+              className="w-1 h-10 bg-[#ff4d00] rounded-full"
+              animate={{ 
+                boxShadow: ['0 0 10px #ff4d00', '0 0 20px #ff4d00', '0 0 10px #ff4d00']
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+              Radar Otaku
+            </h1>
+          </div>
+          <p className="text-[#a1a1a1] text-lg">
             Fique por dentro dos últimos rumores, anúncios e confirmações do mundo otaku.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="search-container">
-          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
+        {/* Search */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="relative mb-6"
+        >
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#525252]">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
           <input
             type="text"
-            className="search-input"
+            className="w-full pl-12 pr-4 py-4 bg-[#121212] border border-[#262626] rounded-xl text-white placeholder-[#525252] focus:border-[#ff4d00] focus:outline-none transition-colors"
             placeholder="Buscar rumores..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-        </div>
+        </motion.div>
 
-        <div className="pickers-row">
-          <VerticalPicker
-            label="Tipo"
-            options={MEDIA_TYPES}
-            selectedValue={selectedType}
-            onChange={(v) => { setSelectedType(v as MediaType); setCurrentPage(1); }}
-          />
-          <VerticalPicker
-            label="Status"
-            options={STATUS_OPTIONS}
-            selectedValue={selectedStatus}
-            onChange={(v) => { setSelectedStatus(v as RumorStatus); setCurrentPage(1); }}
-          />
-          <VerticalPicker
-            label="Confiança"
-            options={CONFIDENCE_OPTIONS}
-            selectedValue={selectedConfidence}
-            onChange={(v) => { setSelectedConfidence(v as ConfidenceLevel); setCurrentPage(1); }}
-          />
-        </div>
-
-        <div className="content-area">
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-number">{stats.total}</span>
-              <span className="stat-label">Total</span>
+        {/* Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <div className="mb-4">
+            <span className="text-xs font-semibold text-[#525252] uppercase tracking-wider mb-2 block">Tipo de Mídia</span>
+            <FilterTabs
+              options={MEDIA_TYPES}
+              selectedValue={selectedType}
+              onChange={(v) => { setSelectedType(v as MediaType); setCurrentPage(1); }}
+            />
+          </div>
+          
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <span className="text-xs font-semibold text-[#525252] uppercase tracking-wider mb-2 block">Status</span>
+              <FilterTabs
+                options={STATUS_OPTIONS}
+                selectedValue={selectedStatus}
+                onChange={(v) => { setSelectedStatus(v as RumorStatus); setCurrentPage(1); }}
+              />
             </div>
-            <div className="stat-card">
-              <span className="stat-number" style={{ color: '#4ade80' }}>{stats.byStatus.confirmed}</span>
-              <span className="stat-label">Confirmados</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-number" style={{ color: '#60a5fa' }}>{stats.byStatus.likely}</span>
-              <span className="stat-label">Prováveis</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-number" style={{ color: '#facc15' }}>{stats.byStatus.circulating}</span>
-              <span className="stat-label">Circulando</span>
+            <div className="flex-1 min-w-[200px]">
+              <span className="text-xs font-semibold text-[#525252] uppercase tracking-wider mb-2 block">Confiança</span>
+              <FilterTabs
+                options={CONFIDENCE_OPTIONS}
+                selectedValue={selectedConfidence}
+                onChange={(v) => { setSelectedConfidence(v as ConfidenceLevel); setCurrentPage(1); }}
+              />
             </div>
           </div>
+        </motion.div>
 
-          <div className="content-header">
-            <span className="results-count">{filteredRumors.length} rumores encontrados</span>
-            <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
-              <option value="recent">Mais Recente</option>
-              <option value="reliable">Mais Confiável</option>
-              <option value="sources">Mais Fontes</option>
-            </select>
+        {/* Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8"
+        >
+          <div className="bg-[#121212] rounded-xl p-4 border border-[#262626]">
+            <div className="text-2xl font-bold text-white mb-1">{stats.total}</div>
+            <div className="text-xs text-[#525252] uppercase tracking-wider">Total</div>
           </div>
+          <div className="bg-[#121212] rounded-xl p-4 border border-[#262626]">
+            <div className="text-2xl font-bold text-green-400 mb-1">{stats.byStatus.confirmed}</div>
+            <div className="text-xs text-[#525252] uppercase tracking-wider">Confirmados</div>
+          </div>
+          <div className="bg-[#121212] rounded-xl p-4 border border-[#262626]">
+            <div className="text-2xl font-bold text-blue-400 mb-1">{stats.byStatus.likely}</div>
+            <div className="text-xs text-[#525252] uppercase tracking-wider">Prováveis</div>
+          </div>
+          <div className="bg-[#121212] rounded-xl p-4 border border-[#262626]">
+            <div className="text-2xl font-bold text-yellow-400 mb-1">{stats.byStatus.circulating}</div>
+            <div className="text-xs text-[#525252] uppercase tracking-wider">Circulando</div>
+          </div>
+        </motion.div>
 
-          <div className="rumors-grid">
-            {paginatedRumors.map(rumor => (
-              <div key={rumor.id} className="rumor-card">
-                <div className="rumor-header">
-                  <span className={`rumor-status ${getStatusColor(rumor.status)}`}>
-                    {rumor.status === 'all' ? 'Todos' : 
-                      rumor.status === 'unverified' ? 'Não Verificado' :
-                      rumor.status === 'circulating' ? 'Circulando' :
-                      rumor.status === 'likely' ? 'Provável' : 'Confirmado'}
+        {/* Results Header */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="flex items-center justify-between mb-6"
+        >
+          <span className="text-[#a1a1a1]">
+            {filteredRumors.length} rumores encontrados
+          </span>
+          <select 
+            className="bg-[#121212] border border-[#262626] rounded-lg px-4 py-2 text-white text-sm focus:border-[#ff4d00] focus:outline-none"
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+          >
+            <option value="recent">Mais Recente</option>
+            <option value="reliable">Mais Confiável</option>
+            <option value="sources">Mais Fontes</option>
+          </select>
+        </motion.div>
+
+        {/* Rumors Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedRumors.map((rumor, index) => (
+            <motion.div
+              key={rumor.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+            >
+              <div className="group bg-[#121212] rounded-xl p-5 border border-[#262626] hover:border-[#ff4d00]/50 transition-all duration-300 cursor-pointer">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <span 
+                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md"
+                    style={{ 
+                      backgroundColor: `${getStatusInfo(rumor.status).color}20`,
+                      color: getStatusInfo(rumor.status).color
+                    }}
+                  >
+                    {getStatusInfo(rumor.status).label}
                   </span>
-                  <span className="rumor-confidence" style={{ color: getConfidenceColor(rumor.confidence) }}>
-                    {rumor.confidence === 'low' ? 'Baixa' : rumor.confidence === 'medium' ? 'Média' : 'Alta'}
+                  <span 
+                    className="text-xs font-semibold"
+                    style={{ color: getConfidenceInfo(rumor.confidence).color }}
+                  >
+                    {getConfidenceInfo(rumor.confidence).label}
                   </span>
                 </div>
-                <h3 className="rumor-title">{rumor.title}</h3>
-                <p className="rumor-description">{rumor.description}</p>
-                <div className="rumor-meta">
-                  <span className="media-type-badge">{rumor.mediaType}</span>
-                  <span className="rumor-date">{new Date(rumor.date).toLocaleDateString('pt-BR')}</span>
-                  <span className="rumor-sources">{rumor.sources} fontes</span>
+
+                {/* Title */}
+                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#ff4d00] transition-colors">
+                  {rumor.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-[#a1a1a1] text-sm mb-4 line-clamp-2">
+                  {rumor.description}
+                </p>
+
+                {/* Meta */}
+                <div className="flex items-center gap-3 text-xs text-[#525252]">
+                  <span className="px-2 py-0.5 bg-[#1a1a1a] rounded capitalize">
+                    {rumor.mediaType.replace('_', ' ')}
+                  </span>
+                  <span>{new Date(rumor.date).toLocaleDateString('pt-BR')}</span>
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    {rumor.sources}
+                  </span>
+                </div>
+
+                {/* Hover Effect */}
+                <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <div className="absolute -inset-1 bg-[#ff4d00]/10 blur-xl" />
                 </div>
               </div>
-            ))}
-          </div>
-
-          {filteredRumors.length === 0 && (
-            <div className="empty-state">
-              <p>Nenhum rumor encontrado com os filtros selecionados.</p>
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div className="pagination">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="pagination-btn"
-              >
-                Anterior
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`pagination-btn ${currentPage === i + 1 ? 'active' : ''}`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="pagination-btn"
-              >
-                Próxima
-              </button>
-            </div>
-          )}
+            </motion.div>
+          ))}
         </div>
+
+        {filteredRumors.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-20"
+          >
+            <div className="text-6xl mb-4">🔍</div>
+            <p className="text-[#a1a1a1] text-lg">Nenhum rumor encontrado com os filtros selecionados.</p>
+          </motion.div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="flex justify-center gap-2 mt-8"
+          >
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 bg-[#121212] border border-[#262626] rounded-lg text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#ff4d00] transition-colors"
+            >
+              Anterior
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`w-10 h-10 rounded-lg text-sm font-semibold transition-all ${
+                  currentPage === i + 1 
+                    ? 'bg-[#ff4d00] text-white' 
+                    : 'bg-[#121212] border border-[#262626] text-white hover:border-[#ff4d00]'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 bg-[#121212] border border-[#262626] rounded-lg text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#ff4d00] transition-colors"
+            >
+              Próxima
+            </button>
+          </motion.div>
+        )}
       </section>
-
-      <style jsx>{`
-        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
-        .mb-6 { margin-bottom: 1.5rem; }
-        .mb-2 { margin-bottom: 0.5rem; }
-
-        .search-container {
-          position: relative;
-          margin-bottom: 1.5rem;
-        }
-
-        .search-icon {
-          position: absolute;
-          left: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 20px;
-          height: 20px;
-          color: var(--text-muted);
-        }
-
-        .search-input {
-          width: 100%;
-          padding: 1rem 1rem 1rem 3rem;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          color: var(--text-primary);
-          font-size: 1rem;
-          font-family: inherit;
-          transition: border-color 0.2s;
-        }
-
-        .search-input:focus {
-          outline: none;
-          border-color: var(--accent);
-        }
-
-        .search-input::placeholder {
-          color: var(--text-muted);
-        }
-
-        .pickers-row {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-          margin-bottom: 2rem;
-        }
-
-        @media (max-width: 640px) {
-          .pickers-row {
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.5rem;
-          }
-        }
-
-        .picker-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          position: relative;
-        }
-
-        .picker-label {
-          font-size: 0.75rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: var(--text-secondary);
-          margin-bottom: 0.5rem;
-          font-weight: 600;
-        }
-
-        .picker-container {
-          height: 48px;
-          overflow-y: scroll;
-          scroll-snap-type: y mandatory;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-          position: relative;
-          width: 100%;
-          mask-image: linear-gradient(to bottom, 
-            transparent 0%, 
-            black 20%, 
-            black 80%, 
-            transparent 100%
-          );
-          -webkit-mask-image: linear-gradient(to bottom, 
-            transparent 0%, 
-            black 20%, 
-            black 80%, 
-            transparent 100%
-          );
-        }
-
-        .picker-container::-webkit-scrollbar {
-          display: none;
-        }
-
-        .picker-item {
-          height: 48px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          scroll-snap-align: start;
-          color: var(--text-muted);
-          font-size: 0.9rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-          border-radius: 8px;
-        }
-
-        .picker-item:hover {
-          color: var(--text-secondary);
-        }
-
-        .picker-item.active {
-          color: var(--accent);
-          font-weight: 600;
-          font-size: 1rem;
-        }
-
-        .picker-indicator {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: calc(100% - 1rem);
-          height: 48px;
-          border: 2px solid var(--accent);
-          border-radius: 8px;
-          pointer-events: none;
-          opacity: 0.3;
-        }
-
-        .content-area {
-          min-width: 0;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 0.75rem;
-          margin-bottom: 1.5rem;
-        }
-
-        @media (max-width: 640px) {
-          .stats-grid {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.5rem;
-          }
-        }
-
-        .stat-card {
-          background: var(--bg-secondary);
-          border-radius: 10px;
-          padding: 1rem 0.5rem;
-          text-align: center;
-        }
-
-        .stat-number {
-          display: block;
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-          font-size: 0.65rem;
-          color: var(--text-secondary);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .content-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1.5rem;
-        }
-
-        .results-count {
-          color: var(--text-secondary);
-          font-size: 0.875rem;
-        }
-
-        .sort-select {
-          padding: 0.5rem 1rem;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          color: var(--text-primary);
-          cursor: pointer;
-          font-size: 0.875rem;
-        }
-
-        .rumors-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 1rem;
-        }
-
-        .rumor-card {
-          background: var(--bg-secondary);
-          border-radius: 12px;
-          padding: 1.25rem;
-          border: 1px solid var(--border);
-          transition: all 0.2s;
-        }
-
-        .rumor-card:hover {
-          border-color: var(--accent);
-          transform: translateY(-2px);
-        }
-
-        .rumor-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 0.75rem;
-        }
-
-        .rumor-status {
-          padding: 0.25rem 0.75rem;
-          border-radius: 20px;
-          font-size: 0.7rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          color: white;
-        }
-
-        .rumor-confidence {
-          font-size: 0.75rem;
-          font-weight: 500;
-        }
-
-        .rumor-title {
-          font-size: 1.125rem;
-          font-weight: 600;
-          margin-bottom: 0.5rem;
-          color: var(--text-primary);
-        }
-
-        .rumor-description {
-          font-size: 0.875rem;
-          color: var(--text-secondary);
-          margin-bottom: 1rem;
-          line-height: 1.5;
-        }
-
-        .rumor-meta {
-          display: flex;
-          gap: 0.75rem;
-          flex-wrap: wrap;
-          font-size: 0.75rem;
-          color: var(--text-muted);
-        }
-
-        .media-type-badge {
-          padding: 0.125rem 0.5rem;
-          background: var(--bg-tertiary);
-          border-radius: 4px;
-          text-transform: capitalize;
-        }
-
-        .rumor-date, .rumor-sources {
-          color: var(--text-muted);
-        }
-
-        .empty-state {
-          text-align: center;
-          padding: 3rem;
-          color: var(--text-secondary);
-        }
-
-        .pagination {
-          display: flex;
-          justify-content: center;
-          gap: 0.5rem;
-          margin-top: 2rem;
-        }
-
-        .pagination-btn {
-          padding: 0.5rem 1rem;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          color: var(--text-primary);
-          cursor: pointer;
-          font-size: 0.875rem;
-          transition: all 0.2s;
-        }
-
-        .pagination-btn:hover:not(:disabled) {
-          border-color: var(--accent);
-        }
-
-        .pagination-btn.active {
-          background: var(--accent);
-          border-color: var(--accent);
-          color: white;
-        }
-
-        .pagination-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .text-accent { color: var(--accent); }
-        .text-text-secondary { color: var(--text-secondary); }
-      `}</style>
     </main>
   );
 }
