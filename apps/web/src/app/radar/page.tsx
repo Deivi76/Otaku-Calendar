@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 type MediaType = 'anime' | 'manga' | 'manhwa' | 'live_action' | 'film';
@@ -43,56 +43,128 @@ const MEDIA_TYPES: { value: MediaType; label: string }[] = [
   { value: 'film', label: 'Filme' },
 ];
 
-const STATUS_LABELS: Record<Exclude<RumorStatus, 'all'>, string> = {
-  unverified: 'Não Verificado',
-  circulating: 'Circulando',
-  likely: 'Provável',
-  confirmed: 'Confirmado',
-};
+const STATUS_OPTIONS: { value: RumorStatus; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'unverified', label: 'Não Verificado' },
+  { value: 'circulating', label: 'Circulando' },
+  { value: 'likely', label: 'Provável' },
+  { value: 'confirmed', label: 'Confirmado' },
+];
 
-const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
-  low: 'Baixa',
-  medium: 'Média',
-  high: 'Alta',
-};
+const CONFIDENCE_OPTIONS: { value: ConfidenceLevel; label: string }[] = [
+  { value: 'low', label: 'Baixa' },
+  { value: 'medium', label: 'Média' },
+  { value: 'high', label: 'Alta' },
+];
+
+interface VerticalPickerProps<T extends string> {
+  label: string;
+  options: { value: T; label: string }[];
+  selectedValue: T;
+  onChange: (value: T) => void;
+}
+
+function VerticalPicker<T extends string>({ label, options, selectedValue, onChange }: VerticalPickerProps<T>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+
+  const itemHeight = 48;
+
+  const scrollToItem = useCallback((value: string) => {
+    const index = options.findIndex(o => o.value === value);
+    if (containerRef.current && index !== -1) {
+      const targetScroll = index * itemHeight;
+      containerRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    }
+  }, [options]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setIsScrolling(true);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsScrolling(false);
+        const scrollTop = container.scrollTop;
+        const centerIndex = Math.round(scrollTop / itemHeight);
+        const validIndex = Math.max(0, Math.min(centerIndex, options.length - 1));
+        const newValue = options[validIndex]?.value;
+        if (newValue && newValue !== selectedValue) {
+          onChange(newValue as T);
+        }
+      }, 100);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [options, selectedValue, onChange]);
+
+  useEffect(() => {
+    scrollToItem(selectedValue);
+  }, []);
+
+  return (
+    <div className="picker-wrapper">
+      <span className="picker-label">{label}</span>
+      <div className="picker-container" ref={containerRef}>
+        {options.map((option) => (
+          <div
+            key={option.value}
+            className={`picker-item ${selectedValue === option.value ? 'active' : ''}`}
+            onClick={() => {
+              scrollToItem(option.value);
+              onChange(option.value as T);
+            }}
+          >
+            {option.label}
+          </div>
+        ))}
+      </div>
+      <div className="picker-indicator" />
+    </div>
+  );
+}
 
 export default function Radar() {
-  const [selectedTypes, setSelectedTypes] = useState<MediaType[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<MediaType>('anime');
   const [selectedStatus, setSelectedStatus] = useState<RumorStatus>('all');
-  const [selectedConfidence, setSelectedConfidence] = useState<ConfidenceLevel[]>([]);
-  const [includeDenied, setIncludeDenied] = useState(true);
+  const [selectedConfidence, setSelectedConfidence] = useState<ConfidenceLevel>('medium');
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
-  const toggleType = (type: MediaType) => {
-    setSelectedTypes(prev => 
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
-  };
-
-  const toggleConfidence = (level: ConfidenceLevel) => {
-    setSelectedConfidence(prev => 
-      prev.includes(level) ? prev.filter(c => c !== level) : [...prev, level]
-    );
-  };
-
   const filteredRumors = useMemo(() => {
     return MOCK_RUMORS.filter(rumor => {
-      if (selectedTypes.length > 0 && !selectedTypes.includes(rumor.mediaType)) return false;
+      const matchesSearch = searchQuery === '' || 
+        rumor.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        rumor.description.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      
+      if (rumor.mediaType !== selectedType) return false;
       if (selectedStatus !== 'all' && rumor.status !== selectedStatus) return false;
-      if (selectedConfidence.length > 0 && !selectedConfidence.includes(rumor.confidence)) return false;
-      if (!includeDenied && rumor.denied) return false;
+      if (rumor.confidence !== selectedConfidence) return false;
       return true;
     }).sort((a, b) => {
       if (sortBy === 'recent') return new Date(b.date).getTime() - new Date(a.date).getTime();
       if (sortBy === 'reliable') {
-        const confidenceOrder = { high: 3, medium: 2, low: 1 };
+        const confidenceOrder: Record<ConfidenceLevel, number> = { high: 3, medium: 2, low: 1 };
         return confidenceOrder[b.confidence] - confidenceOrder[a.confidence];
       }
       return b.sources - a.sources;
     });
-  }, [selectedTypes, selectedStatus, selectedConfidence, includeDenied, sortBy]);
+  }, [searchQuery, selectedType, selectedStatus, selectedConfidence, sortBy]);
 
   const totalPages = Math.ceil(filteredRumors.length / itemsPerPage);
   const paginatedRumors = filteredRumors.slice(
@@ -101,16 +173,19 @@ export default function Radar() {
   );
 
   const stats = useMemo(() => {
-    const total = MOCK_RUMORS.length;
+    const filtered = MOCK_RUMORS.filter(r => 
+      r.mediaType === selectedType && 
+      (selectedStatus === 'all' || r.status === selectedStatus)
+    );
+    const total = filtered.length;
     const byStatus = {
-      unverified: MOCK_RUMORS.filter(r => r.status === 'unverified').length,
-      circulating: MOCK_RUMORS.filter(r => r.status === 'circulating').length,
-      likely: MOCK_RUMORS.filter(r => r.status === 'likely').length,
-      confirmed: MOCK_RUMORS.filter(r => r.status === 'confirmed').length,
+      unverified: filtered.filter(r => r.status === 'unverified').length,
+      circulating: filtered.filter(r => r.status === 'circulating').length,
+      likely: filtered.filter(r => r.status === 'likely').length,
+      confirmed: filtered.filter(r => r.status === 'confirmed').length,
     };
-    const recentTrend = MOCK_RUMORS.filter(r => new Date(r.date) > new Date('2026-03-20')).length;
-    return { total, byStatus, recentTrend };
-  }, []);
+    return { total, byStatus };
+  }, [selectedType, selectedStatus]);
 
   const getStatusColor = (status: RumorStatus) => {
     const colors: Record<RumorStatus, string> = {
@@ -125,9 +200,9 @@ export default function Radar() {
 
   const getConfidenceColor = (confidence: ConfidenceLevel) => {
     const colors = {
-      low: 'text-red-400',
-      medium: 'text-yellow-400',
-      high: 'text-green-400',
+      low: '#f87171',
+      medium: '#facc15',
+      high: '#4ade80',
     };
     return colors[confidence];
   };
@@ -145,335 +220,325 @@ export default function Radar() {
       </header>
 
       <section className="py-8">
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Radar Otaku</h1>
           <p className="text-text-secondary">
             Fique por dentro dos últimos rumores, anúncios e confirmações do mundo otaku.
           </p>
         </div>
 
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {MEDIA_TYPES.map(type => (
-            <button
-              key={type.value}
-              onClick={() => toggleType(type.value)}
-              className={`filter-chip ${selectedTypes.includes(type.value) ? 'active' : ''}`}
-            >
-              {type.label}
-            </button>
-          ))}
+        <div className="search-container">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar rumores..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
 
-        <div className="grid-layout">
-          <aside className="sidebar">
-            <div className="sidebar-section">
-              <h3 className="sidebar-title">Tipo de Mídia</h3>
-              <div className="filter-list">
-                {MEDIA_TYPES.map(type => (
-                  <label key={type.value} className="filter-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedTypes.includes(type.value)}
-                      onChange={() => toggleType(type.value)}
-                    />
-                    <span>{type.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+        <div className="pickers-row">
+          <VerticalPicker
+            label="Tipo"
+            options={MEDIA_TYPES}
+            selectedValue={selectedType}
+            onChange={(v) => { setSelectedType(v as MediaType); setCurrentPage(1); }}
+          />
+          <VerticalPicker
+            label="Status"
+            options={STATUS_OPTIONS}
+            selectedValue={selectedStatus}
+            onChange={(v) => { setSelectedStatus(v as RumorStatus); setCurrentPage(1); }}
+          />
+          <VerticalPicker
+            label="Confiança"
+            options={CONFIDENCE_OPTIONS}
+            selectedValue={selectedConfidence}
+            onChange={(v) => { setSelectedConfidence(v as ConfidenceLevel); setCurrentPage(1); }}
+          />
+        </div>
 
-            <div className="sidebar-section">
-              <h3 className="sidebar-title">Status</h3>
-              <div className="filter-list">
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <label key={value} className="filter-radio">
-                    <input
-                      type="radio"
-                      name="status"
-                      checked={selectedStatus === value}
-                      onChange={() => setSelectedStatus(value as RumorStatus)}
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </div>
+        <div className="content-area">
+          <div className="stats-grid">
+            <div className="stat-card">
+              <span className="stat-number">{stats.total}</span>
+              <span className="stat-label">Total</span>
             </div>
-
-            <div className="sidebar-section">
-              <h3 className="sidebar-title">Nível de Confiança</h3>
-              <div className="filter-list">
-                {Object.entries(CONFIDENCE_LABELS).map(([value, label]) => (
-                  <label key={value} className="filter-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedConfidence.includes(value as ConfidenceLevel)}
-                      onChange={() => toggleConfidence(value as ConfidenceLevel)}
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </div>
+            <div className="stat-card">
+              <span className="stat-number" style={{ color: '#4ade80' }}>{stats.byStatus.confirmed}</span>
+              <span className="stat-label">Confirmados</span>
             </div>
-
-            <div className="sidebar-section">
-              <label className="filter-toggle">
-                <input
-                  type="checkbox"
-                  checked={includeDenied}
-                  onChange={() => setIncludeDenied(!includeDenied)}
-                />
-                <span>Incluir rumores negados</span>
-              </label>
+            <div className="stat-card">
+              <span className="stat-number" style={{ color: '#60a5fa' }}>{stats.byStatus.likely}</span>
+              <span className="stat-label">Prováveis</span>
             </div>
-          </aside>
-
-          <div className="main-content">
-            <div className="stats-grid">
-              <div className="stat-card">
-                <span className="stat-number">{stats.total}</span>
-                <span className="stat-label">Total de Rumores</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number text-green-400">{stats.byStatus.confirmed}</span>
-                <span className="stat-label">Confirmados</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number text-blue-400">{stats.byStatus.likely}</span>
-                <span className="stat-label">Prováveis</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number text-yellow-400">{stats.byStatus.circulating}</span>
-                <span className="stat-label">Circulando</span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-number text-gray-400">{stats.byStatus.unverified}</span>
-                <span className="stat-label">Não Verificados</span>
-              </div>
-              <div className="stat-card">
-                <span className={`stat-number ${stats.recentTrend > 5 ? 'text-green-400' : 'text-yellow-400'}`}>
-                  {stats.recentTrend > 5 ? '↑' : '→'}
-                </span>
-                <span className="stat-label">Tendência (7 dias)</span>
-              </div>
+            <div className="stat-card">
+              <span className="stat-number" style={{ color: '#facc15' }}>{stats.byStatus.circulating}</span>
+              <span className="stat-label">Circulando</span>
             </div>
-
-            <div className="content-header">
-              <span className="results-count">{filteredRumors.length} rumores encontrados</span>
-              <div className="sort-select">
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
-                  <option value="recent">Mais Recente</option>
-                  <option value="reliable">Mais Confiável</option>
-                  <option value="sources">Mais Fontes</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="rumors-grid">
-              {paginatedRumors.map(rumor => (
-                <div key={rumor.id} className="rumor-card">
-                  <div className="rumor-header">
-                    <span className={`rumor-status ${getStatusColor(rumor.status)}`}>
-                      {rumor.status !== 'all' ? STATUS_LABELS[rumor.status] : rumor.status}
-                    </span>
-                    <span className={`rumor-confidence ${getConfidenceColor(rumor.confidence)}`}>
-                      {CONFIDENCE_LABELS[rumor.confidence]}
-                    </span>
-                  </div>
-                  <h3 className="rumor-title">{rumor.title}</h3>
-                  <p className="rumor-description">{rumor.description}</p>
-                  <div className="rumor-meta">
-                    <span className="media-type-badge">{rumor.mediaType}</span>
-                    <span className="rumor-date">{new Date(rumor.date).toLocaleDateString('pt-BR')}</span>
-                    <span className="rumor-sources">{rumor.sources} fontes</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="pagination">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="pagination-btn"
-                >
-                  Anterior
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`pagination-btn ${currentPage === i + 1 ? 'active' : ''}`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="pagination-btn"
-                >
-                  Próxima
-                </button>
-              </div>
-            )}
           </div>
+
+          <div className="content-header">
+            <span className="results-count">{filteredRumors.length} rumores encontrados</span>
+            <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
+              <option value="recent">Mais Recente</option>
+              <option value="reliable">Mais Confiável</option>
+              <option value="sources">Mais Fontes</option>
+            </select>
+          </div>
+
+          <div className="rumors-grid">
+            {paginatedRumors.map(rumor => (
+              <div key={rumor.id} className="rumor-card">
+                <div className="rumor-header">
+                  <span className={`rumor-status ${getStatusColor(rumor.status)}`}>
+                    {rumor.status === 'all' ? 'Todos' : 
+                      rumor.status === 'unverified' ? 'Não Verificado' :
+                      rumor.status === 'circulating' ? 'Circulando' :
+                      rumor.status === 'likely' ? 'Provável' : 'Confirmado'}
+                  </span>
+                  <span className="rumor-confidence" style={{ color: getConfidenceColor(rumor.confidence) }}>
+                    {rumor.confidence === 'low' ? 'Baixa' : rumor.confidence === 'medium' ? 'Média' : 'Alta'}
+                  </span>
+                </div>
+                <h3 className="rumor-title">{rumor.title}</h3>
+                <p className="rumor-description">{rumor.description}</p>
+                <div className="rumor-meta">
+                  <span className="media-type-badge">{rumor.mediaType}</span>
+                  <span className="rumor-date">{new Date(rumor.date).toLocaleDateString('pt-BR')}</span>
+                  <span className="rumor-sources">{rumor.sources} fontes</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredRumors.length === 0 && (
+            <div className="empty-state">
+              <p>Nenhum rumor encontrado com os filtros selecionados.</p>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="pagination-btn"
+              >
+                Anterior
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`pagination-btn ${currentPage === i + 1 ? 'active' : ''}`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="pagination-btn"
+              >
+                Próxima
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
       <style jsx>{`
         .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
-        .mb-8 { margin-bottom: 2rem; }
         .mb-6 { margin-bottom: 1.5rem; }
         .mb-2 { margin-bottom: 0.5rem; }
-        .flex { display: flex; }
-        .gap-2 { gap: 0.5rem; }
-        .flex-wrap { flex-wrap: wrap; }
-        
-        .grid-layout {
-          display: grid;
-          grid-template-columns: 280px 1fr;
-          gap: 2rem;
+
+        .search-container {
+          position: relative;
+          margin-bottom: 1.5rem;
         }
-        
-        @media (max-width: 1024px) {
-          .grid-layout {
-            grid-template-columns: 1fr;
-          }
+
+        .search-icon {
+          position: absolute;
+          left: 1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 20px;
+          height: 20px;
+          color: var(--text-muted);
         }
-        
-        .filter-chip {
-          padding: 0.5rem 1rem;
+
+        .search-input {
+          width: 100%;
+          padding: 1rem 1rem 1rem 3rem;
           background: var(--bg-secondary);
           border: 1px solid var(--border);
-          border-radius: 20px;
-          cursor: pointer;
-          font-size: 0.875rem;
-          transition: all 0.2s;
-          color: var(--text-secondary);
-        }
-        
-        .filter-chip:hover {
-          border-color: var(--accent);
-        }
-        
-        .filter-chip.active {
-          background: var(--accent);
-          color: white;
-          border-color: var(--accent);
-        }
-        
-        .sidebar {
-          background: var(--bg-secondary);
           border-radius: 12px;
-          padding: 1.5rem;
-          height: fit-content;
-          position: sticky;
-          top: 1rem;
-        }
-        
-        .sidebar-section {
-          margin-bottom: 1.5rem;
-          padding-bottom: 1.5rem;
-          border-bottom: 1px solid var(--border);
-        }
-        
-        .sidebar-section:last-child {
-          margin-bottom: 0;
-          padding-bottom: 0;
-          border-bottom: none;
-        }
-        
-        .sidebar-title {
-          font-weight: 600;
-          margin-bottom: 1rem;
-          font-size: 0.875rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: var(--text-secondary);
-        }
-        
-        .filter-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-        
-        .filter-checkbox, .filter-radio {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          cursor: pointer;
-          font-size: 0.875rem;
           color: var(--text-primary);
+          font-size: 1rem;
+          font-family: inherit;
+          transition: border-color 0.2s;
         }
-        
-        .filter-checkbox input, .filter-radio input {
-          accent-color: var(--accent);
-          width: 16px;
-          height: 16px;
+
+        .search-input:focus {
+          outline: none;
+          border-color: var(--accent);
         }
-        
-        .filter-toggle {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          cursor: pointer;
-          font-size: 0.875rem;
+
+        .search-input::placeholder {
+          color: var(--text-muted);
         }
-        
-        .filter-toggle input {
-          accent-color: var(--accent);
-          width: 16px;
-          height: 16px;
-        }
-        
-        .main-content {
-          min-width: 0;
-        }
-        
-        .stats-grid {
+
+        .pickers-row {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          grid-template-columns: repeat(3, 1fr);
           gap: 1rem;
           margin-bottom: 2rem;
         }
-        
+
+        @media (max-width: 640px) {
+          .pickers-row {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+          }
+        }
+
+        .picker-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          position: relative;
+        }
+
+        .picker-label {
+          font-size: 0.75rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-secondary);
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+        }
+
+        .picker-container {
+          height: 48px;
+          overflow-y: scroll;
+          scroll-snap-type: y mandatory;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          position: relative;
+          width: 100%;
+          mask-image: linear-gradient(to bottom, 
+            transparent 0%, 
+            black 20%, 
+            black 80%, 
+            transparent 100%
+          );
+          -webkit-mask-image: linear-gradient(to bottom, 
+            transparent 0%, 
+            black 20%, 
+            black 80%, 
+            transparent 100%
+          );
+        }
+
+        .picker-container::-webkit-scrollbar {
+          display: none;
+        }
+
+        .picker-item {
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          scroll-snap-align: start;
+          color: var(--text-muted);
+          font-size: 0.9rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          border-radius: 8px;
+        }
+
+        .picker-item:hover {
+          color: var(--text-secondary);
+        }
+
+        .picker-item.active {
+          color: var(--accent);
+          font-weight: 600;
+          font-size: 1rem;
+        }
+
+        .picker-indicator {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: calc(100% - 1rem);
+          height: 48px;
+          border: 2px solid var(--accent);
+          border-radius: 8px;
+          pointer-events: none;
+          opacity: 0.3;
+        }
+
+        .content-area {
+          min-width: 0;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.75rem;
+          margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 640px) {
+          .stats-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+          }
+        }
+
         .stat-card {
           background: var(--bg-secondary);
-          border-radius: 12px;
-          padding: 1.25rem;
+          border-radius: 10px;
+          padding: 1rem 0.5rem;
           text-align: center;
         }
-        
+
         .stat-number {
           display: block;
-          font-size: 1.75rem;
+          font-size: 1.5rem;
           font-weight: 700;
           color: var(--text-primary);
           margin-bottom: 0.25rem;
         }
-        
+
         .stat-label {
-          font-size: 0.75rem;
+          font-size: 0.65rem;
           color: var(--text-secondary);
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
-        
+
         .content-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 1.5rem;
         }
-        
+
         .results-count {
           color: var(--text-secondary);
           font-size: 0.875rem;
         }
-        
-        .sort-select select {
+
+        .sort-select {
           padding: 0.5rem 1rem;
           background: var(--bg-secondary);
           border: 1px solid var(--border);
@@ -482,33 +547,33 @@ export default function Radar() {
           cursor: pointer;
           font-size: 0.875rem;
         }
-        
+
         .rumors-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-          gap: 1.5rem;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 1rem;
         }
-        
+
         .rumor-card {
           background: var(--bg-secondary);
           border-radius: 12px;
-          padding: 1.5rem;
+          padding: 1.25rem;
           border: 1px solid var(--border);
           transition: all 0.2s;
         }
-        
+
         .rumor-card:hover {
           border-color: var(--accent);
           transform: translateY(-2px);
         }
-        
+
         .rumor-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 0.75rem;
         }
-        
+
         .rumor-status {
           padding: 0.25rem 0.75rem;
           border-radius: 20px;
@@ -517,26 +582,26 @@ export default function Radar() {
           text-transform: uppercase;
           color: white;
         }
-        
+
         .rumor-confidence {
           font-size: 0.75rem;
           font-weight: 500;
         }
-        
+
         .rumor-title {
           font-size: 1.125rem;
           font-weight: 600;
           margin-bottom: 0.5rem;
           color: var(--text-primary);
         }
-        
+
         .rumor-description {
           font-size: 0.875rem;
           color: var(--text-secondary);
           margin-bottom: 1rem;
           line-height: 1.5;
         }
-        
+
         .rumor-meta {
           display: flex;
           gap: 0.75rem;
@@ -544,25 +609,31 @@ export default function Radar() {
           font-size: 0.75rem;
           color: var(--text-muted);
         }
-        
+
         .media-type-badge {
           padding: 0.125rem 0.5rem;
           background: var(--bg-tertiary);
           border-radius: 4px;
           text-transform: capitalize;
         }
-        
+
         .rumor-date, .rumor-sources {
           color: var(--text-muted);
         }
-        
+
+        .empty-state {
+          text-align: center;
+          padding: 3rem;
+          color: var(--text-secondary);
+        }
+
         .pagination {
           display: flex;
           justify-content: center;
           gap: 0.5rem;
           margin-top: 2rem;
         }
-        
+
         .pagination-btn {
           padding: 0.5rem 1rem;
           background: var(--bg-secondary);
@@ -573,28 +644,23 @@ export default function Radar() {
           font-size: 0.875rem;
           transition: all 0.2s;
         }
-        
+
         .pagination-btn:hover:not(:disabled) {
           border-color: var(--accent);
         }
-        
+
         .pagination-btn.active {
           background: var(--accent);
           border-color: var(--accent);
           color: white;
         }
-        
+
         .pagination-btn:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
-        
+
         .text-accent { color: var(--accent); }
-        .text-green-400 { color: #4ade80; }
-        .text-blue-400 { color: #60a5fa; }
-        .text-yellow-400 { color: #facc15; }
-        .text-red-400 { color: #f87171; }
-        .text-gray-400 { color: #9ca3af; }
         .text-text-secondary { color: var(--text-secondary); }
       `}</style>
     </main>

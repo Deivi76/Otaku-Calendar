@@ -9,9 +9,7 @@ export interface CrawledItem {
   publishedAt?: string;
 }
 
-const parser = new Parser({
-  timeout: 30000,
-});
+const parser = new Parser();
 
 export async function crawlRSS(url: string): Promise<CrawledItem[]> {
   try {

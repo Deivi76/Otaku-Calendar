@@ -1,9 +1,13 @@
 {
   "/_not-found": "app/_not-found.js",
-  "/auth/callback/route": "app/auth/callback/route.js",
   "/anime/[id]/page": "app/anime/[id]/page.js",
+  "/api/progress/route": "app/api/progress/route.js",
+  "/api/user/stats/route": "app/api/user/stats/route.js",
+  "/auth/callback/route": "app/auth/callback/route.js",
+  "/favorites/page": "app/favorites/page.js",
   "/page": "app/page.js",
   "/radar/page": "app/radar/page.js",
-  "/api/rumors/[id]/route": "app/api/rumors/[id]/route.js",
-  "/api/crawl/route": "app/api/crawl/route.js"
+  "/stats/page": "app/stats/page.js",
+  "/api/inngest/route": "app/api/inngest/route.js",
+  "/api/rumors/[id]/route": "app/api/rumors/[id]/route.js"
 }

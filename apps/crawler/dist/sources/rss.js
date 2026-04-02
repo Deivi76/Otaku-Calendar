@@ -1,7 +1,5 @@
 import Parser from 'rss-parser';
-const parser = new Parser({
-    timeout: 30000,
-});
+const parser = new Parser();
 export async function crawlRSS(url) {
     try {
         const feed = await parser.parseURL(url);

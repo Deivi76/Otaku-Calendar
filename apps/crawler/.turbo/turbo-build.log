@@ -1,4 +1,14 @@
 
 > @otaku-calendar/crawler@0.1.0 build
-> tsc
+> esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js --external:cheerio --external:rss-parser --external:dotenv
 
+✘ [ERROR] Could not resolve "src/index.ts"
+
+1 error
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path /workspaces/Otaku-Calendar/apps/crawler
+npm error workspace @otaku-calendar/crawler@0.1.0
+npm error location /workspaces/Otaku-Calendar/apps/crawler
+npm error command failed
+npm error command sh -c esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js --external:cheerio --external:rss-parser --external:dotenv

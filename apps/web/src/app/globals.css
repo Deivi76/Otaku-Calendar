@@ -1,21 +1,53 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
-:root {
-  --bg-primary: #0f0f0f;
-  --bg-secondary: #1a1a1a;
-  --bg-tertiary: #252525;
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --text-muted: #666666;
-  --accent: #ff6b35;
-  --accent-hover: #ff8c5a;
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #ef4444;
-  --rumor: #a855f7;
-  --announcement: #3b82f6;
-  --live-action: #ec4899;
-  --border: #2a2a2a;
+@import "tailwindcss";
+
+@theme {
+  /* Colors - Otaku Calendar Brand */
+  --color-otaku-bg: #0f0f0f;
+  --color-otaku-bg-secondary: #1a1a1a;
+  --color-otaku-bg-tertiary: #252525;
+  --color-otaku-text: #ffffff;
+  --color-otaku-text-secondary: #a0a0a0;
+  --color-otaku-text-muted: #666666;
+  --color-otaku-accent: #ff6b35;
+  --color-otaku-accent-hover: #ff8c5a;
+  --color-otaku-success: #22c55e;
+  --color-otaku-warning: #eab308;
+  --color-otaku-error: #ef4444;
+  --color-otaku-rumor: #a855f7;
+  --color-otaku-announcement: #3b82f6;
+  --color-otaku-live-action: #ec4899;
+  --color-otaku-border: #2a2a2a;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+
+  /* Typography */
+  --font-outfit: 'Outfit', system-ui, sans-serif;
+
+  /* Shadows */
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+  --shadow-card-hover: 0 20px 25px -5px rgb(0 0 0 / 0.4);
+  --shadow-bottom-sheet: 0 -10px 40px rgb(0 0 0 / 0.5);
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 * {
@@ -25,10 +57,11 @@
 }
 
 html, body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: 'Outfit', sans-serif;
+  background: var(--color-otaku-bg);
+  color: var(--color-otaku-text);
+  font-family: var(--font-outfit);
   min-height: 100vh;
+  scroll-behavior: smooth;
 }
 
 a {
@@ -36,216 +69,302 @@ a {
   text-decoration: none;
 }
 
+/* Container */
 .container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 var(--spacing-md);
 }
 
+@media (min-width: 768px) {
+  .container {
+    padding: 0 var(--spacing-xl);
+  }
+}
+
+/* Header Styles */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
+  padding: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--color-otaku-border);
+  background: linear-gradient(180deg, rgba(15, 15, 15, 0.95) 0%, rgba(15, 15, 15, 0.8) 100%);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .logo {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--color-otaku-accent);
+  letter-spacing: -0.025em;
 }
 
 .nav {
   display: flex;
-  gap: 2rem;
+  gap: var(--spacing-lg);
+  align-items: center;
 }
 
 .nav a {
   font-weight: 500;
-  transition: color 0.2s;
+  transition: color 0.3s var(--ease-out-expo);
+  position: relative;
+}
+
+.nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--color-otaku-accent);
+  transition: width 0.3s var(--ease-out-expo);
 }
 
 .nav a:hover {
-  color: var(--accent);
+  color: var(--color-otaku-accent);
 }
 
+.nav a:hover::after {
+  width: 100%;
+}
+
+.nav a.active {
+  color: var(--color-otaku-accent);
+}
+
+.nav a.active::after {
+  width: 100%;
+}
+
+/* Week Grid */
 .week-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 1px;
-  background: var(--border);
-  border-radius: 12px;
+  background: var(--color-otaku-border);
+  border-radius: var(--radius-xl);
   overflow: hidden;
 }
 
 .day-column {
-  background: var(--bg-secondary);
+  background: var(--color-otaku-bg-secondary);
   min-height: 400px;
 }
 
 .day-header {
-  padding: 1rem;
+  padding: var(--spacing-md);
   text-align: center;
-  background: var(--bg-tertiary);
+  background: var(--color-otaku-bg-tertiary);
   font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .day-header.today {
-  background: var(--accent);
+  background: var(--color-otaku-accent);
   color: white;
+  box-shadow: 0 0 20px rgba(255, 107, 53, 0.4);
 }
 
 .day-content {
-  padding: 0.5rem;
+  padding: var(--spacing-sm);
 }
 
+/* Episode Card */
 .episode-card {
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  border-left: 3px solid var(--accent);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+  background: var(--color-otaku-bg-tertiary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-otaku-accent);
+  transition: all 0.3s var(--ease-out-expo);
+  cursor: pointer;
+}
+
+.episode-card:hover {
+  background: var(--color-otaku-bg-secondary);
+  transform: translateX(4px);
+  box-shadow: var(--shadow-card);
 }
 
 .episode-card.rumor {
-  border-left-color: var(--rumor);
+  border-left-color: var(--color-otaku-rumor);
 }
 
 .episode-card.announcement {
-  border-left-color: var(--announcement);
+  border-left-color: var(--color-otaku-announcement);
 }
 
-.episode-card.live_action {
-  border-left-color: var(--live-action);
+.episode-card.live-action {
+  border-left-color: var(--color-otaku-live-action);
 }
 
 .episode-title {
   font-weight: 600;
-  font-size: 0.9rem;
-  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.3;
 }
 
 .episode-number {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--color-otaku-text-secondary);
 }
 
+/* Badges */
 .badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
   font-size: 0.65rem;
-  border-radius: 4px;
-  margin-left: 0.5rem;
+  border-radius: var(--radius-sm);
+  margin-left: var(--spacing-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .badge.rumor {
   background: rgba(168, 85, 247, 0.2);
-  color: var(--rumor);
+  color: var(--color-otaku-rumor);
 }
 
 .badge.announcement {
   background: rgba(59, 130, 246, 0.2);
-  color: var(--announcement);
+  color: var(--color-otaku-announcement);
 }
 
-.badge.live_action {
+.badge.live-action {
   background: rgba(236, 72, 153, 0.2);
-  color: var(--live-action);
+  color: var(--color-otaku-live-action);
 }
 
+/* Anime Page */
 .anime-page {
   display: grid;
   grid-template-columns: 300px 1fr;
-  gap: 2rem;
-  padding: 2rem 0;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-xl) 0;
 }
 
 .anime-cover {
   width: 100%;
   aspect-ratio: 2/3;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
 }
 
 .anime-info h1 {
   font-size: 2rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: -0.025em;
 }
 
 .anime-meta {
-  color: var(--text-secondary);
-  margin-bottom: 1rem;
+  color: var(--color-otaku-text-secondary);
+  margin-bottom: var(--spacing-md);
 }
 
 .episode-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
 }
 
 .episode-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: var(--bg-secondary);
-  border-radius: 8px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-otaku-bg-secondary);
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
+}
+
+.episode-item:hover {
+  background: var(--color-otaku-bg-tertiary);
 }
 
 .episode-item.watched {
   opacity: 0.5;
 }
 
+/* Buttons */
 .watch-btn {
-  padding: 0.5rem 1rem;
-  background: var(--bg-tertiary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-otaku-bg-tertiary);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s;
+  font-weight: 500;
+  transition: all 0.2s var(--ease-out-expo);
 }
 
 .watch-btn:hover {
-  background: var(--accent);
+  background: var(--color-otaku-accent);
+  transform: translateY(-2px);
 }
 
 .watch-btn.watched {
-  background: var(--success);
-  color: white;
-}
-
-.radar-tabs {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.radar-tab {
-  padding: 0.75rem 1.5rem;
-  background: var(--bg-secondary);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.radar-tab.active {
-  background: var(--accent);
+  background: var(--color-otaku-success);
   color: white;
 }
 
 .login-btn {
-  padding: 0.5rem 1rem;
-  background: var(--accent);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: linear-gradient(135deg, var(--color-otaku-accent) 0%, var(--color-otaku-accent-hover) 100%);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   color: white;
+  transition: all 0.3s var(--ease-out-expo);
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
 }
 
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
+}
+
+/* Radar Tabs */
+.radar-tabs {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  overflow-x: auto;
+  padding-bottom: var(--spacing-sm);
+}
+
+.radar-tab {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-otaku-bg-secondary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s var(--ease-out-expo);
+  white-space: nowrap;
+}
+
+.radar-tab:hover {
+  background: var(--color-otaku-bg-tertiary);
+}
+
+.radar-tab.active {
+  background: linear-gradient(135deg, var(--color-otaku-accent) 0%, var(--color-otaku-accent-hover) 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+}
+
+/* Responsive */
 @media (max-width: 1024px) {
   .week-grid {
     grid-template-columns: repeat(4, 1fr);
@@ -265,4 +384,306 @@ a {
     max-width: 300px;
     margin: 0 auto;
   }
+
+  .header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+  }
+
+  .nav {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+  }
+}
+
+/* Shimmer Animation for Skeleton */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes animate-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-otaku-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-otaku-bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-otaku-accent);
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Category horizontal scroll */
+.category-scroll {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.category-scroll > * {
+  scroll-snap-align: start;
+}
+
+/* Bottom sheet backdrop */
+.bottom-sheet-backdrop {
+  backdrop-filter: blur(4px);
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-otaku-accent) 0%, #ff9f6b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--color-otaku-accent);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: var(--color-otaku-accent);
+  color: white;
+}
+
+/* Command Menu (Cmd+K) */
+.command-menu {
+  background: var(--color-otaku-bg-secondary);
+  border: 1px solid var(--color-otaku-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.command-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-otaku-border);
+}
+
+.command-search-icon {
+  color: var(--color-otaku-text-muted);
+  flex-shrink: 0;
+}
+
+.command-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-otaku-text);
+  font-family: var(--font-outfit);
+  font-size: 1rem;
+  outline: none;
+}
+
+.command-input::placeholder {
+  color: var(--color-otaku-text-muted);
+}
+
+.command-shortcut {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.command-shortcut kbd {
+  padding: 0.2rem 0.5rem;
+  background: var(--color-otaku-bg-tertiary);
+  border: 1px solid var(--color-otaku-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-outfit);
+  font-size: 0.75rem;
+  color: var(--color-otaku-text-secondary);
+}
+
+.command-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+}
+
+.command-empty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--color-otaku-text-muted);
+}
+
+.command-group {
+  margin-bottom: var(--spacing-sm);
+}
+
+.command-group [cmdk-group-heading] {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-otaku-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.command-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s var(--ease-out-expo);
+}
+
+.command-item:hover,
+.command-item[data-selected="true"] {
+  background: var(--color-otaku-bg-tertiary);
+}
+
+.command-item[data-selected="true"] {
+  background: var(--color-otaku-accent);
+}
+
+.command-item[data-selected="true"] .command-item-title,
+.command-item[data-selected="true"] .command-item-english,
+.command-item[data-selected="true"] .command-item-score,
+.command-item[data-selected="true"] .command-item-type {
+  color: white;
+}
+
+.command-item-image {
+  width: 40px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.command-item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.command-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.command-item-title {
+  font-weight: 500;
+  color: var(--color-otaku-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-item-english {
+  font-size: 0.875rem;
+  color: var(--color-otaku-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-item-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.command-item-score {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-otaku-accent);
+}
+
+.command-item-type {
+  font-size: 0.75rem;
+  color: var(--color-otaku-text-muted);
+  text-transform: uppercase;
+}
+
+.command-footer {
+  display: flex;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-top: 1px solid var(--color-otaku-border);
+  background: var(--color-otaku-bg-tertiary);
+}
+
+.command-footer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.75rem;
+  color: var(--color-otaku-text-muted);
+}
+
+.command-footer-item kbd {
+  padding: 0.15rem 0.4rem;
+  background: var(--color-otaku-bg-secondary);
+  border: 1px solid var(--color-otaku-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-outfit);
+  font-size: 0.7rem;
 }

@@ -1,5 +1,10 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { randomBytes } from 'crypto';
+
+function generateState(): string {
+  return randomBytes(32).toString('hex');
+}
 
 export function createClient() {
   const cookieStore = cookies();
@@ -14,14 +19,26 @@ export function createClient() {
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set(name, value, options);
+            cookieStore.set(name, value, {
+              ...options,
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+            });
           } catch (error) {
             // Handle cookie error
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set(name, '', options);
+            cookieStore.set(name, '', {
+              ...options,
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+            });
           } catch (error) {
             // Handle cookie error
           }
@@ -39,12 +56,31 @@ export async function getSession() {
 
 export async function signInWithGoogle() {
   const supabase = createClient();
+  const state = generateState();
+  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      scopes: 'email profile openid',
     },
   });
+
+  if (data?.url) {
+    const url = new URL(data.url);
+    url.searchParams.set('state', state);
+    data.url = url.toString();
+    
+    const cookieStore = cookies();
+    cookieStore.set('oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 10,
+    });
+  }
+
   return { data, error };
 }
 

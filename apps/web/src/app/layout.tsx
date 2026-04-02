@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { CommandMenuProvider } from '@/components/CommandMenuProvider';
 
 export const metadata: Metadata = {
   title: 'Otaku Calendar - Seu calendário de animes',
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body className="antialiased">
+        <CommandMenuProvider>{children}</CommandMenuProvider>
+      </body>
     </html>
   );
 }

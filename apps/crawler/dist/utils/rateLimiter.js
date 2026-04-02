@@ -80,23 +80,34 @@ export class RateLimiter {
         while (queue.length > 0) {
             await this.waitForToken(source);
             const request = queue[0];
-            try {
-                this.consumeToken(source);
-                const result = await request.fn();
-                request.resolve(result);
-            }
-            catch (error) {
-                const err = error instanceof Error ? error : new Error(String(error));
-                if (err.message.includes('429')) {
-                    const config = this.configs[source];
-                    const retryAfter = config.retryAfter || config.windowMs;
-                    await this.sleep(retryAfter);
-                    continue;
+            const MAX_RETRIES = 1;
+            const BASE_DELAY = 1000;
+            const MAX_DELAY = 60000;
+            const JITTER = 1000;
+            let retries = 0;
+            while (retries < MAX_RETRIES) {
+                try {
+                    this.consumeToken(source);
+                    const result = await request.fn();
+                    request.resolve(result);
+                    queue.shift();
+                    break;
                 }
-                request.reject(err);
-            }
-            finally {
-                queue.shift();
+                catch (error) {
+                    const err = error instanceof Error ? error : new Error(String(error));
+                    const isRetryable = err.message.includes('429') ||
+                        err.message.match(/5\d{2}/);
+                    if (isRetryable && retries < MAX_RETRIES - 1) {
+                        const delay = Math.min(BASE_DELAY * Math.pow(2, retries) + Math.random() * JITTER, MAX_DELAY);
+                        console.log(`[RateLimiter] ${source}: Retry ${retries + 1}/${MAX_RETRIES} after ${Math.round(delay)}ms`);
+                        await this.sleep(delay);
+                        retries++;
+                        continue;
+                    }
+                    request.reject(err);
+                    queue.shift();
+                    break;
+                }
             }
         }
         this.processing.set(source, false);
@@ -123,24 +134,29 @@ export class RateLimiter {
 }
 export const DEFAULT_CONFIGS = {
     anilist: {
-        maxRequests: 90,
+        maxRequests: 30,
         windowMs: 60000,
         retryAfter: 60000,
     },
     jikan: {
         maxRequests: 3,
         windowMs: 1000,
-        retryAfter: 1000,
+        retryAfter: 1500,
     },
     kitsu: {
-        maxRequests: 100,
+        maxRequests: 50,
         windowMs: 60000,
         retryAfter: 60000,
     },
     tmdb: {
-        maxRequests: 40,
+        maxRequests: 30,
         windowMs: 1000,
-        retryAfter: 1000,
+        retryAfter: 1500,
+    },
+    mangadex: {
+        maxRequests: 5,
+        windowMs: 1000,
+        retryAfter: 2000,
     },
 };
 export const rateLimiter = new RateLimiter(DEFAULT_CONFIGS);
